@@ -5372,6 +5372,8 @@ if(e('reports'))renderReports();
 .cloudUserButton{width:40px;height:40px;border-radius:14px;background:var(--soft);color:var(--text);border:1px solid var(--line);display:grid;place-items:center;font-weight:950}
 .teamForm{background:var(--soft);margin-bottom:12px}.teamGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.teamUser{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.teamUser small{display:block;color:var(--muted);margin-top:3px}.teamUser button{min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--text);font-weight:900}.teamInactive{opacity:.55}.cloudRequestedBy{display:block;margin-top:3px;color:var(--info);font-size:11px;font-weight:850}
 .pendingCleanupHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}.pendingCleanupHeader .title{margin:0}.pendingClearAll{min-height:34px;padding:0 10px;border-radius:8px;background:rgba(179,38,30,.1);border:1px solid rgba(179,38,30,.22);color:var(--bad);font-size:11px;font-weight:950}.pendingClearAll:disabled{opacity:.45;cursor:not-allowed}.pendingRemoveOne{width:36px;height:36px;border-radius:999px;background:rgba(179,38,30,.1);border:1px solid rgba(179,38,30,.22);color:var(--bad);font-size:18px;font-weight:950;display:grid;place-items:center}.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:minmax(0,1fr) minmax(156px,188px) 38px 38px}
+.quickPurchaseCard{margin-bottom:12px}.quickPurchaseCard .title{margin-bottom:4px}.quickPurchaseHint{margin:0 0 12px;color:var(--muted);font-size:12px;font-weight:750;line-height:1.4}.quickPurchaseGrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(90px,.65fr) minmax(110px,.8fr);gap:9px}.quickPurchaseGrid .field{margin:0}.quickPurchaseGrid label{font-size:12px}.quickPurchaseGrid input,.quickPurchaseGrid select{min-height:44px}.quickPurchaseFooter{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);gap:9px;align-items:end;margin-top:9px}.quickPurchaseFooter .field{margin:0}.quickPurchaseButton{min-height:44px;border:0;border-radius:9px;background:var(--primary);color:#fff;padding:0 15px;font-weight:950}.quickPurchaseButton:disabled{opacity:.6;cursor:wait}
+@media(max-width:560px){.quickPurchaseGrid{grid-template-columns:1fr 1fr}.quickPurchaseGrid .quickProductField{grid-column:1 / -1}.quickPurchaseFooter{grid-template-columns:1fr}.quickPurchaseButton{width:100%}}
 @media(max-width:390px){.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:1fr 38px 38px}.adminPendingFinalRow.pendingCleanupRow .adminFinalInputs{grid-column:1 / -1;grid-row:2}.adminPendingFinalRow.pendingCleanupRow .adminFinalCheck{grid-column:2;grid-row:1}.adminPendingFinalRow.pendingCleanupRow .pendingRemoveOne{grid-column:3;grid-row:1}}
 @media(max-width:380px){.teamGrid{grid-template-columns:1fr}}
 
@@ -5722,6 +5724,81 @@ function enhancePendingCleanup(){
     var remove=document.createElement('button');remove.type='button';remove.className='pendingRemoveOne';remove.dataset.removePending=buy.dataset.adminFinalPendingBuy;remove.title='Remover dos pendentes';remove.setAttribute('aria-label','Remover produto dos pendentes');remove.textContent='×';row.appendChild(remove);
   });
 }
+function quickText(value){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+}
+function quickNumber(value){
+  var raw=String(value==null?'':value).trim().replace(/\s/g,'');
+  if(raw.indexOf(',')>=0)raw=raw.replace(/\./g,'').replace(',','.');
+  var number=Number(raw);
+  return Number.isFinite(number)?number:0;
+}
+function quickProductByName(name){
+  var key=quickText(name);
+  return (state.products||[]).find(function(item){return item&&quickText(item.name)===key})||null;
+}
+function fillQuickPurchaseFromProduct(){
+  var input=document.getElementById('quickPurchaseProduct');
+  var p=input&&quickProductByName(input.value);
+  if(!p)return;
+  var price=document.getElementById('quickPurchasePrice');
+  if(price&&!price.value&&Number(p.price||0)>0)price.value=String(Number(p.price||0)).replace('.',',');
+  var market=document.getElementById('quickPurchaseMarket');
+  var choices=typeof productMarkets==='function'?productMarkets(p):[];
+  if(market&&choices.length)market.value=choices[0];
+}
+function resetQuickPurchase(){
+  var productInput=document.getElementById('quickPurchaseProduct');
+  var qty=document.getElementById('quickPurchaseQty');
+  var price=document.getElementById('quickPurchasePrice');
+  if(productInput)productInput.value='';
+  if(qty)qty.value='1';
+  if(price)price.value='';
+  if(productInput)productInput.focus();
+}
+function registerQuickPurchase(event){
+  if(event)event.preventDefault();
+  if(!cloudUser||cloudUser.role!=='admin'){toast('Acesso exclusivo do administrador.');return}
+  var name=document.getElementById('quickPurchaseProduct').value.trim();
+  var qty=quickNumber(document.getElementById('quickPurchaseQty').value);
+  var price=quickNumber(document.getElementById('quickPurchasePrice').value);
+  var market=document.getElementById('quickPurchaseMarket').value||'Bahamas';
+  if(!name){toast('Informe o produto comprado.');return}
+  if(qty<=0){toast('Informe uma quantidade válida.');return}
+  if(price<0){toast('Informe um preço válido.');return}
+  var p=quickProductByName(name);
+  var slug=quickText(name).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'produto';
+  var now=new Date();
+  var productId=p?p.id:'avulso-'+slug;
+  var line={
+    productId:productId,name:p?p.name:name,category:p?(p.cat||'Sem categoria'):'Compra avulsa',
+    unit:p?(p.unit||'unidade'):'unidade',market:typeof normalizeMarketName==='function'?normalizeMarketName(market):market,
+    qty:qty,unitPrice:price,total:qty*price,sectors:{},days:{},status:'bought',source:'compra-avulsa',dateISO:now.toISOString()
+  };
+  state.purchases=Array.isArray(state.purchases)?state.purchases:[];
+  state.purchases.unshift({
+    id:'avulsa-'+now.getTime(),name:'Compra avulsa - '+line.name,date:now.toLocaleString('pt-BR'),dateISO:now.toISOString(),
+    total:line.total,itemTotal:qty,items:1,lines:[line]
+  });
+  save();
+  if(typeof renderReports==='function')renderReports();
+  resetQuickPurchase();
+  toast('Compra avulsa registrada.');
+}
+function ensureQuickPurchasePanel(){
+  if(!cloudUser||cloudUser.role!=='admin'||document.getElementById('quickPurchaseCard'))return;
+  var dash=document.getElementById('dash');if(!dash)return;
+  var card=document.createElement('article');card.id='quickPurchaseCard';card.className='card quickPurchaseCard';
+  card.innerHTML='<h2 class="title">Registrar compra avulsa</h2><p class="quickPurchaseHint">Para produtos que já foram comprados e não passaram pela Lista Mestra.</p><form id="quickPurchaseForm"><div class="quickPurchaseGrid"><div class="field quickProductField"><label for="quickPurchaseProduct">Produto</label><input id="quickPurchaseProduct" list="quickPurchaseProducts" autocomplete="off" placeholder="Ex.: Manga" required><datalist id="quickPurchaseProducts"></datalist></div><div class="field"><label for="quickPurchaseQty">Quantidade</label><input id="quickPurchaseQty" inputmode="decimal" value="1" required></div><div class="field"><label for="quickPurchasePrice">Preço unitário</label><input id="quickPurchasePrice" inputmode="decimal" placeholder="Opcional"></div></div><div class="quickPurchaseFooter"><div class="field"><label for="quickPurchaseMarket">Mercado</label><select id="quickPurchaseMarket"></select></div><button class="quickPurchaseButton" type="submit">Registrar como comprado</button></div></form>';
+  var pending=document.getElementById('adminPendingPanel');
+  if(pending)pending.insertAdjacentElement('afterend',card);else dash.insertBefore(card,dash.firstChild);
+  var list=document.getElementById('quickPurchaseProducts');
+  (state.products||[]).filter(function(p){return p&&p.name&&p.active!==false}).sort(function(a,b){return a.name.localeCompare(b.name,'pt-BR')}).forEach(function(p){var option=document.createElement('option');option.value=p.name;list.appendChild(option)});
+  var marketSelect=document.getElementById('quickPurchaseMarket');
+  (typeof markets!=='undefined'&&Array.isArray(markets)?markets:['Bahamas','BH','Armação','Ecomart','Festa','Laticínio']).forEach(function(name){var option=document.createElement('option');option.value=name;option.textContent=name;marketSelect.appendChild(option)});
+  document.getElementById('quickPurchaseProduct').addEventListener('change',fillQuickPurchaseFromProduct);
+  document.getElementById('quickPurchaseForm').addEventListener('submit',registerQuickPurchase);
+}
 document.addEventListener('click',function(event){
   var one=event.target.closest('[data-remove-pending]');
   if(one){
@@ -5737,9 +5814,10 @@ document.addEventListener('click',function(event){
     if(ids.length&&confirm('Remover todos os '+ids.length+' itens pendentes? Esta ação não poderá ser desfeita.')){removePendingIds(ids);toast('Lista de pendentes limpa.')}
   }
 },true);
-var pendingObserver=new MutationObserver(function(){enhancePendingCleanup()});
+var pendingObserver=new MutationObserver(function(){enhancePendingCleanup();ensureQuickPurchasePanel()});
 pendingObserver.observe(document.body,{childList:true,subtree:true});
 enhancePendingCleanup();
+ensureQuickPurchasePanel();
 
 function start(){
   createChrome();
