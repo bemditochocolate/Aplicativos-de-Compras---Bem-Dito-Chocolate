@@ -5371,6 +5371,8 @@ if(e('reports'))renderReports();
 .cloudStatus{margin-top:5px;font-size:11px;color:var(--muted);font-weight:800}.cloudStatus.ok{color:var(--ok)}.cloudStatus.bad{color:var(--bad)}
 .cloudUserButton{width:40px;height:40px;border-radius:14px;background:var(--soft);color:var(--text);border:1px solid var(--line);display:grid;place-items:center;font-weight:950}
 .teamForm{background:var(--soft);margin-bottom:12px}.teamGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.teamUser{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.teamUser small{display:block;color:var(--muted);margin-top:3px}.teamUser button{min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--text);font-weight:900}.teamInactive{opacity:.55}.cloudRequestedBy{display:block;margin-top:3px;color:var(--info);font-size:11px;font-weight:850}
+.pendingCleanupHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}.pendingCleanupHeader .title{margin:0}.pendingClearAll{min-height:34px;padding:0 10px;border-radius:8px;background:rgba(179,38,30,.1);border:1px solid rgba(179,38,30,.22);color:var(--bad);font-size:11px;font-weight:950}.pendingClearAll:disabled{opacity:.45;cursor:not-allowed}.pendingRemoveOne{width:36px;height:36px;border-radius:999px;background:rgba(179,38,30,.1);border:1px solid rgba(179,38,30,.22);color:var(--bad);font-size:18px;font-weight:950;display:grid;place-items:center}.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:minmax(0,1fr) minmax(156px,188px) 38px 38px}
+@media(max-width:390px){.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:1fr 38px 38px}.adminPendingFinalRow.pendingCleanupRow .adminFinalInputs{grid-column:1 / -1;grid-row:2}.adminPendingFinalRow.pendingCleanupRow .adminFinalCheck{grid-column:2;grid-row:1}.adminPendingFinalRow.pendingCleanupRow .pendingRemoveOne{grid-column:3;grid-row:1}}
 @media(max-width:380px){.teamGrid{grid-template-columns:1fr}}
 
 </style>
@@ -5684,6 +5686,60 @@ function decorateRequestedBy(){
 var previousRenderMaster=window.renderMaster;
 window.renderMaster=function(){if(typeof previousRenderMaster==='function')previousRenderMaster();decorateRequestedBy()};
 renderMaster=window.renderMaster;
+
+function pendingName(id){
+  var pending=(state.adminPendingItems||[]).find(function(item){return item&&item.id===id});
+  var p=typeof product==='function'?product(id):null;
+  return p&&p.name||pending&&pending.name||'este produto';
+}
+function removePendingIds(ids){
+  var lookup={};ids.forEach(function(id){lookup[id]=true});
+  state.adminPendingItems=(state.adminPendingItems||[]).filter(function(item){return item&&!lookup[item.id]});
+  ['adminPurchaseQty','adminPurchasePrice','reportBuyMarketByProduct'].forEach(function(key){
+    if(!state[key])return;
+    ids.forEach(function(id){delete state[key][id]});
+  });
+  save();
+  try{if(typeof renderAdminPendingPurchases==='function')renderAdminPendingPurchases()}catch(err){}
+  try{if(typeof renderAdmin==='function')renderAdmin()}catch(err){}
+  enhancePendingCleanup();
+}
+function enhancePendingCleanup(){
+  var panel=document.getElementById('adminPendingPanel');
+  if(!panel)return;
+  var title=panel.querySelector(':scope > .title');
+  if(title&&!panel.querySelector('.pendingCleanupHeader')){
+    var header=document.createElement('div');header.className='pendingCleanupHeader';
+    title.parentNode.insertBefore(header,title);header.appendChild(title);
+    var clear=document.createElement('button');clear.type='button';clear.className='pendingClearAll';clear.dataset.clearAllPending='1';clear.textContent='Limpar todos';header.appendChild(clear);
+  }
+  var count=(state.adminPendingItems||[]).filter(function(item){return item&&item.id}).length;
+  var clearAll=panel.querySelector('[data-clear-all-pending]');if(clearAll)clearAll.disabled=count===0;
+  Array.prototype.forEach.call(panel.querySelectorAll('.adminPendingFinalRow'),function(row){
+    var buy=row.querySelector('[data-admin-final-pending-buy]');
+    if(!buy||row.querySelector('[data-remove-pending]'))return;
+    row.classList.add('pendingCleanupRow');
+    var remove=document.createElement('button');remove.type='button';remove.className='pendingRemoveOne';remove.dataset.removePending=buy.dataset.adminFinalPendingBuy;remove.title='Remover dos pendentes';remove.setAttribute('aria-label','Remover produto dos pendentes');remove.textContent='×';row.appendChild(remove);
+  });
+}
+document.addEventListener('click',function(event){
+  var one=event.target.closest('[data-remove-pending]');
+  if(one){
+    event.preventDefault();event.stopImmediatePropagation();
+    var id=one.dataset.removePending;
+    if(confirm('Remover "'+pendingName(id)+'" da lista de itens pendentes?')){removePendingIds([id]);toast('Produto removido dos pendentes.')}
+    return;
+  }
+  var all=event.target.closest('[data-clear-all-pending]');
+  if(all){
+    event.preventDefault();event.stopImmediatePropagation();
+    var ids=(state.adminPendingItems||[]).filter(function(item){return item&&item.id}).map(function(item){return item.id});
+    if(ids.length&&confirm('Remover todos os '+ids.length+' itens pendentes? Esta ação não poderá ser desfeita.')){removePendingIds(ids);toast('Lista de pendentes limpa.')}
+  }
+},true);
+var pendingObserver=new MutationObserver(function(){enhancePendingCleanup()});
+pendingObserver.observe(document.body,{childList:true,subtree:true});
+enhancePendingCleanup();
 
 function start(){
   createChrome();
