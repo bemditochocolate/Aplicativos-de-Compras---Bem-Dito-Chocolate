@@ -5400,6 +5400,20 @@ var originalSave=window.save;
 function clone(value){return JSON.parse(JSON.stringify(value==null?{}:value))}
 function same(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function uid(){return crypto.randomUUID?crypto.randomUUID():'bd-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
+function saveDeviceLogin(credentials){
+  try{localStorage.setItem('bd-cloud-session',JSON.stringify(credentials));sessionStorage.removeItem('bd-cloud-session')}catch(err){}
+}
+function readDeviceLogin(){
+  var stored=null;
+  try{
+    stored=JSON.parse(localStorage.getItem('bd-cloud-session')||sessionStorage.getItem('bd-cloud-session')||'null');
+    if(stored&&stored.username&&stored.pin)saveDeviceLogin(stored);
+  }catch(err){}
+  return stored;
+}
+function clearDeviceLogin(){
+  try{localStorage.removeItem('bd-cloud-session');sessionStorage.removeItem('bd-cloud-session')}catch(err){}
+}
 function ensureItemIds(){
   Object.keys(state.lists||{}).forEach(function(key){
     (state.lists[key]||[]).forEach(function(item){if(item&&!item._cloudId)item._cloudId=uid()});
@@ -5563,7 +5577,7 @@ function loginNow(){
   rpc('bd_login',{p_username:username,p_pin:pin}).then(function(result){
     if(!result||!result.ok)throw new Error(result&&result.message||'Usuário ou PIN inválido.');
     cloudCredentials={username:username,pin:pin};cloudUser=result.user;
-    sessionStorage.setItem('bd-cloud-session',JSON.stringify(cloudCredentials));
+    saveDeviceLogin(cloudCredentials);
     localStorage.setItem('bd-cloud-username',username);
     return enterApplication();
   }).catch(function(err){message.textContent=err.message||'Não foi possível entrar.'}).finally(function(){button.disabled=false;button.textContent='Entrar'});
@@ -5612,7 +5626,7 @@ var masterTab=document.getElementById('tabMaster');if(masterTab)masterTab.onclic
 var adminButton=document.getElementById('tabAdmin');if(adminButton)adminButton.onclick=function(){unlockAdmin('dash')};
 
 function logout(){
-  sessionStorage.removeItem('bd-cloud-session');
+  clearDeviceLogin();
   cloudCredentials=null;cloudUser=null;cloudReady=false;cloudVersion=0;cloudBase={};lastSharedJson='';
   var pin=document.getElementById('cloudPin');if(pin)pin.value='';
   showLogin('Você saiu do aplicativo.');
@@ -5661,7 +5675,7 @@ function saveTeamUser(){
   button.disabled=true;button.textContent='Salvando...';
   rpc('bd_admin_save_user',{p_admin_username:cloudCredentials.username,p_admin_pin:cloudCredentials.pin,p_username:username,p_full_name:name,p_new_pin:newPin,p_role:role,p_sector:sector,p_active:active}).then(function(result){
     if(!result||!result.ok)throw new Error(result&&result.message||'Não foi possível salvar.');
-    if(username===cloudCredentials.username&&newPin){cloudCredentials.pin=newPin;sessionStorage.setItem('bd-cloud-session',JSON.stringify(cloudCredentials))}
+    if(username===cloudCredentials.username&&newPin){cloudCredentials.pin=newPin;saveDeviceLogin(cloudCredentials)}
     clearTeamForm();document.getElementById('teamUsername').readOnly=false;document.getElementById('teamPin').placeholder='Mínimo 4 números';renderTeamUsers();toast('Funcionário salvo.');
   }).catch(function(err){toast(err.message||'Erro ao salvar funcionário.')}).finally(function(){button.disabled=false;button.textContent='Salvar funcionário'});
 }
@@ -5823,8 +5837,8 @@ function start(){
   createChrome();
   if(!window.supabase){showLogin('Não foi possível carregar a conexão. Verifique a internet.');return}
   cloudClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false}});
-  var stored=null;try{stored=JSON.parse(sessionStorage.getItem('bd-cloud-session')||'null')}catch(err){}
-  if(stored&&stored.username&&stored.pin){cloudCredentials=stored;rpc('bd_login',{p_username:stored.username,p_pin:stored.pin}).then(function(result){if(!result||!result.ok)throw new Error();cloudUser=result.user;return enterApplication()}).catch(function(){sessionStorage.removeItem('bd-cloud-session');showLogin('Entre novamente para continuar.')})}
+  var stored=readDeviceLogin();
+  if(stored&&stored.username&&stored.pin){cloudCredentials=stored;rpc('bd_login',{p_username:stored.username,p_pin:stored.pin}).then(function(result){if(!result||!result.ok)throw new Error();cloudUser=result.user;return enterApplication()}).catch(function(){clearDeviceLogin();showLogin('Entre novamente para continuar.')})}
   else showLogin('');
   setInterval(poll,5000);
 }
