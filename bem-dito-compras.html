@@ -5564,10 +5564,20 @@ function showLogin(message){
   cloudReady=false;
   var overlay=document.getElementById('cloudLogin');
   if(overlay)overlay.classList.remove('hide');
+  var username=document.getElementById('cloudUsername');
+  var pin=document.getElementById('cloudPin');
+  if(username)username.disabled=false;
+  if(pin)pin.disabled=false;
   var msg=document.getElementById('cloudLoginMessage');if(msg)msg.textContent=message||'';
   setTimeout(function(){var field=document.getElementById('cloudUsername');if(field)field.focus()},30);
 }
-function hideLogin(){var overlay=document.getElementById('cloudLogin');if(overlay)overlay.classList.add('hide')}
+function hideLogin(){
+  var overlay=document.getElementById('cloudLogin');if(overlay)overlay.classList.add('hide');
+  var username=document.getElementById('cloudUsername');
+  var pin=document.getElementById('cloudPin');
+  if(username)username.disabled=true;
+  if(pin)pin.disabled=true;
+}
 function loginNow(){
   var username=document.getElementById('cloudUsername').value.trim().toLowerCase();
   var pin=document.getElementById('cloudPin').value;
@@ -5813,6 +5823,23 @@ function ensureQuickPurchasePanel(){
   document.getElementById('quickPurchaseProduct').addEventListener('change',fillQuickPurchaseFromProduct);
   document.getElementById('quickPurchaseForm').addEventListener('submit',registerQuickPurchase);
 }
+function preventPasswordSuggestionsOnProductFields(){
+  ['search','quickPurchaseProduct'].forEach(function(id){
+    var input=document.getElementById(id);if(!input)return;
+    input.setAttribute('type','search');
+    input.setAttribute('name',id==='search'?'product_search':'quick_product_search');
+    input.setAttribute('autocomplete','off');
+    input.setAttribute('autocorrect','off');
+    input.setAttribute('spellcheck','false');
+    input.setAttribute('data-lpignore','true');
+    input.setAttribute('data-1p-ignore','true');
+    input.setAttribute('data-form-type','other');
+  });
+  var legacyPassword=document.getElementById('adminPass');
+  if(legacyPassword){legacyPassword.disabled=true;legacyPassword.setAttribute('autocomplete','off')}
+  var teamPin=document.getElementById('teamPin');
+  if(teamPin)teamPin.setAttribute('autocomplete','new-password');
+}
 document.addEventListener('click',function(event){
   var one=event.target.closest('[data-remove-pending]');
   if(one){
@@ -5828,10 +5855,11 @@ document.addEventListener('click',function(event){
     if(ids.length&&confirm('Remover todos os '+ids.length+' itens pendentes? Esta ação não poderá ser desfeita.')){removePendingIds(ids);toast('Lista de pendentes limpa.')}
   }
 },true);
-var pendingObserver=new MutationObserver(function(){enhancePendingCleanup();ensureQuickPurchasePanel()});
+var pendingObserver=new MutationObserver(function(){enhancePendingCleanup();ensureQuickPurchasePanel();preventPasswordSuggestionsOnProductFields()});
 pendingObserver.observe(document.body,{childList:true,subtree:true});
 enhancePendingCleanup();
 ensureQuickPurchasePanel();
+preventPasswordSuggestionsOnProductFields();
 
 function start(){
   createChrome();
