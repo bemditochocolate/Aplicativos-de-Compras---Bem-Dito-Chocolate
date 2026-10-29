@@ -3468,32 +3468,6 @@ function buyQtyValue(productId){
   var value=Number(state.adminPurchaseQty[productId]||0);
   return value>0?value:'';
 }
-function buyControls(productId,unit){
-  return '<label class="adminBuyField"><span>Qtd.</span><input data-admin-final-qty="'+clean(productId)+'" value="'+clean(buyQtyValue(productId))+'" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="'+clean(unit||'Qtd.')+'"></label><label class="adminBuyField"><span>Pre&ccedil;o atual</span><input data-admin-final-price="'+clean(productId)+'" value="'+clean(buyPriceValue(productId))+'" type="text" inputmode="decimal" placeholder="0,00"></label>';
-}
-function readPurchaseInputs(button,productId){
-  var row=button.closest('.adminFinalBuyRow,.adminPendingFinalRow');
-  var qtyInput=row?row.querySelector('[data-admin-final-qty]'):null;
-  var priceInput=row?row.querySelector('[data-admin-final-price]'):null;
-  var qty=Number(qtyInput&&qtyInput.value);
-  var price=parseMoneyInput(priceInput&&priceInput.value);
-  if(!qty||qty<=0){
-    toast('Informe a quantidade comprada.');
-    if(qtyInput)qtyInput.focus();
-    return null;
-  }
-  if(!price||price<=0){
-    toast('Informe o preco da compra.');
-    if(priceInput)priceInput.focus();
-    return null;
-  }
-  ensureAdminBuyStores();
-  state.adminPurchaseQty[productId]=qty;
-  state.adminPurchasePrice[productId]=price;
-  if(priceInput)priceInput.value=String(price.toFixed(2)).replace('.',',');
-  save();
-  return {qty:qty,price:price};
-}
 function purchaseQty(productId){
   ensureAdminBuyStores();
   return Number(state.adminPurchaseQty[productId]||0);
@@ -3579,7 +3553,7 @@ window.renderMaster=function(){
     if(!rows.length)return '';
     var body=rows.map(function(item){
       var p=item.product;
-      return '<div class="adminFinalBuyRow"><strong>'+clean(p.name)+'</strong><div class="adminFinalInputs">'+buyControls(p.id,p.unit)+'</div><button class="adminFinalCheck" type="button" title="Comprar" data-admin-final-buy="'+clean(p.id)+'">✓</button></div>';
+      return '<div class="adminFinalBuyRow"><strong>'+clean(p.name)+'</strong><button class="adminFinalCheck" type="button" title="Comprar" data-admin-final-buy="'+clean(p.id)+'">✓</button></div>';
     }).join('');
     return '<section class="marketSection simpleMarket"><div class="simpleMarketTitle">'+clean(market)+'</div><div class="simpleMarketItems">'+body+'</div></section>';
   }).join('');
@@ -3609,7 +3583,7 @@ window.renderAdminPendingPurchases=function(){
     var p=product(item.id);
     var name=p?p.name:item.name;
     var markets=p?productMarkets(p):(item.markets||[]);
-    return '<div class="adminPendingItem adminPendingFinalRow"><div><strong>'+clean(name)+'</strong><small>'+clean(markets.join(', '))+'</small></div><div class="adminFinalInputs">'+buyControls(item.id,p?(p.unit||'Qtd.'):(item.unit||'Qtd.'))+'</div><button class="adminFinalCheck pendingFinalCheck" type="button" title="Comprar" data-admin-final-pending-buy="'+clean(item.id)+'">✓</button></div>';
+    return '<div class="adminPendingItem adminPendingFinalRow"><div><strong>'+clean(name)+'</strong><small>'+clean(markets.join(', '))+'</small></div><button class="adminFinalCheck pendingFinalCheck" type="button" title="Comprar" data-admin-final-pending-buy="'+clean(item.id)+'">✓</button></div>';
   }).join(''):'<div class="empty">Nenhum item pendente.</div>';
 };
 renderAdminPendingPurchases=window.renderAdminPendingPurchases;
@@ -3668,7 +3642,6 @@ document.addEventListener('click',function(event){
         state.reportBuyMarketByProduct[productId]=market;
       }
     }
-    if(!readPurchaseInputs(buy,productId))return;
     setBoughtEverywhere(productId,true);
     toast('Item comprado com preco da compra.');
     return;
@@ -3687,7 +3660,6 @@ document.addEventListener('click',function(event){
     event.preventDefault();
     event.stopImmediatePropagation();
     var pendingId=pending.dataset.adminFinalPendingBuy;
-    if(!readPurchaseInputs(pending,pendingId))return;
     buyPendingItem(pendingId);
   }
 },true);
@@ -4081,9 +4053,6 @@ function finalBuyPriceValue(productId){
   var value=Number(state.adminPurchasePrice[productId]||0)||Number(p&&p.price||0);
   return value>0?String(value.toFixed(2)).replace('.',','):'';
 }
-function finalBuyControls(productId,unit){
-  return '<label class="adminBuyField"><span>Qtd.</span><input data-admin-final-qty="'+clean(productId)+'" value="'+clean(finalBuyQtyValue(productId))+'" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="'+clean(unit||'Qtd.')+'"></label><label class="adminBuyField"><span>Pre&ccedil;o atual</span><input data-admin-final-price="'+clean(productId)+'" value="'+clean(finalBuyPriceValue(productId))+'" type="text" inputmode="decimal" placeholder="0,00"></label>';
-}
 function finalSetBoughtEverywhere(productId,bought){
   Object.keys(state.lists||{}).forEach(function(key){
     (state.lists[key]||[]).forEach(function(item){
@@ -4093,9 +4062,6 @@ function finalSetBoughtEverywhere(productId,bought){
     });
   });
   save();
-}
-function finalReadPurchaseInputs(button,productId){
- var row=button.closest('.adminFinalBuyRow,.adminPendingFinalRow');var input=row?row.querySelector('[data-admin-final-qty]'):null;var qty=Number(input&&input.value);if(!qty||qty<=0){toast('Informe a quantidade comprada.');if(input)input.focus();return null}finalEnsurePurchaseStores();state.adminPurchaseQty[productId]=qty;save();return {qty:qty,price:0};
 }
 function finalRenderMaster(){
   if(!e('masterList'))return;
@@ -4120,7 +4086,7 @@ function finalRenderMaster(){
     if(!rows.length)return '';
     var body=rows.map(function(item){
       var p=item.product;
-      return '<div class="adminFinalBuyRow"><strong>'+clean(p.name)+'</strong><div class="adminFinalInputs">'+finalBuyControls(p.id,p.unit)+'</div><button class="adminFinalCheck" type="button" title="Comprar" data-final-buy="'+clean(p.id)+'">✓</button></div>';
+      return '<div class="adminFinalBuyRow"><strong>'+clean(p.name)+'</strong><button class="adminFinalCheck" type="button" title="Comprar" data-final-buy="'+clean(p.id)+'">✓</button></div>';
     }).join('');
     return '<section class="marketSection simpleMarket"><div class="simpleMarketTitle">'+clean(market)+'</div><div class="simpleMarketItems"><span class="masterCheck masterPresence" aria-hidden="true"></span>'+body+'</div></section>';
   }).join('');
@@ -4274,7 +4240,6 @@ document.addEventListener('click',function(event){
         state.reportBuyMarketByProduct[buyId]=market;
       }
     }
-    if(!finalReadPurchaseInputs(buy,buyId))return;
     finalSetBoughtEverywhere(buyId,true);
     renderAdmin();
     if(typeof renderCollaboratorSentList==='function')renderCollaboratorSentList();
@@ -5969,5 +5934,6 @@ start();
 })();
 
 </script>
+<style id="guideChecklistOnly">.adminFinalBuyRow,.adminPendingFinalRow{grid-template-columns:minmax(0,1fr) 38px!important}.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:minmax(0,1fr) 38px 38px!important}.adminFinalCheck{grid-column:2!important;grid-row:1!important;justify-self:end}.adminPendingFinalRow.pendingCleanupRow .pendingRemoveOne{grid-column:3!important;grid-row:1!important}.adminFinalInputs{display:none!important}</style>
 </body>
 </html>
