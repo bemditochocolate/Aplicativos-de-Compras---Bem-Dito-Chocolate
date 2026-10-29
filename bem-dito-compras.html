@@ -5382,8 +5382,8 @@ if(e('reports'))renderReports();
 (function(){
 'use strict';
 
-var SUPABASE_URL='https://hgrqzxazdytawbzvmlwf.supabase.co';
-var SUPABASE_KEY='sb_publishable_UVHO5RzC3WRwRIuXaeT4sQ_8cnJ39aS';
+var SUPABASE_URL='https://htmwhbgemtvgxcdcgysx.supabase.co';
+var SUPABASE_KEY='sb_publishable_llKVYreGXKh3CLYOeK482w_Sj0I26PF';
 var SHARED_KEYS=['currentList','lists','purchases','products','adminPendingItems','adminPurchasePrice','adminPurchaseQty','reportBuyMarketByProduct'];
 var cloudClient=null;
 var cloudCredentials=null;
@@ -5401,18 +5401,18 @@ function clone(value){return JSON.parse(JSON.stringify(value==null?{}:value))}
 function same(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function uid(){return crypto.randomUUID?crypto.randomUUID():'bd-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
 function saveDeviceLogin(credentials){
-  try{localStorage.setItem('bd-cloud-session',JSON.stringify(credentials));sessionStorage.removeItem('bd-cloud-session')}catch(err){}
+  try{localStorage.setItem('bd-cloud-session-v2',JSON.stringify(credentials));sessionStorage.removeItem('bd-cloud-session-v2')}catch(err){}
 }
 function readDeviceLogin(){
   var stored=null;
   try{
-    stored=JSON.parse(localStorage.getItem('bd-cloud-session')||sessionStorage.getItem('bd-cloud-session')||'null');
+    stored=JSON.parse(localStorage.getItem('bd-cloud-session-v2')||sessionStorage.getItem('bd-cloud-session-v2')||'null');
     if(stored&&stored.username&&stored.pin)saveDeviceLogin(stored);
   }catch(err){}
   return stored;
 }
 function clearDeviceLogin(){
-  try{localStorage.removeItem('bd-cloud-session');sessionStorage.removeItem('bd-cloud-session')}catch(err){}
+  try{localStorage.removeItem('bd-cloud-session-v2');sessionStorage.removeItem('bd-cloud-session-v2')}catch(err){}
 }
 function ensureItemIds(){
   Object.keys(state.lists||{}).forEach(function(key){
@@ -5657,7 +5657,7 @@ function ensureTeamView(){
   var nav=document.querySelector('.adminNav');var admin=document.getElementById('admin');if(!nav||!admin)return;
   var tab=document.createElement('button');tab.dataset.admin='team';tab.textContent='Equipe';nav.appendChild(tab);nav.style.gridTemplateColumns='repeat(3,1fr)';
   var view=document.createElement('div');view.id='team';view.className='view';
-  view.innerHTML='<article class="card teamForm"><h2 class="title">Cadastrar funcionário</h2><div class="teamGrid"><div class="field"><label>Nome</label><input id="teamName" placeholder="Nome completo"></div><div class="field"><label>Usuário</label><input id="teamUsername" placeholder="Ex.: nadiny"></div></div><div class="teamGrid"><div class="field"><label>PIN</label><input id="teamPin" type="password" inputmode="numeric" placeholder="Mínimo 4 números"></div><div class="field"><label>Perfil</label><select id="teamRole"><option value="staff">Funcionário</option><option value="admin">Administrador</option></select></div></div><div class="field"><label>Setor</label><select id="teamSector"><option>Confeitaria</option><option>Cozinha Loja</option><option>Cozinha Almoco</option><option>Frente de Loja</option></select></div><label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input id="teamActive" type="checkbox" checked> Usuário ativo</label><input id="teamEditing" type="hidden"><div class="actions"><button class="btn secondary" id="teamClear" type="button">Limpar</button><button class="btn primary" id="teamSave" type="button">Salvar funcionário</button></div></article><h2 class="title">Usuários cadastrados</h2><div id="teamList" class="list"><div class="empty">Carregando...</div></div>';
+  view.innerHTML='<article class="card teamForm"><h2 class="title">Cadastrar funcionário</h2><div class="teamGrid"><div class="field"><label>Nome</label><input id="teamName" placeholder="Nome completo"></div><div class="field"><label>Usuário</label><input id="teamUsername" placeholder="Ex.: nadiny"></div></div><div class="teamGrid"><div class="field"><label>PIN</label><input id="teamPin" type="password" inputmode="numeric" placeholder="Mínimo 6 números"></div><div class="field"><label>Perfil</label><select id="teamRole"><option value="staff">Funcionário</option><option value="admin">Administrador</option></select></div></div><div class="field"><label>Setor</label><select id="teamSector"><option>Confeitaria</option><option>Cozinha Loja</option><option>Cozinha Almoco</option><option>Frente de Loja</option></select></div><label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input id="teamActive" type="checkbox" checked> Usuário ativo</label><input id="teamEditing" type="hidden"><div class="actions"><button class="btn secondary" id="teamClear" type="button">Limpar</button><button class="btn primary" id="teamSave" type="button">Salvar funcionário</button></div></article><h2 class="title">Usuários cadastrados</h2><div id="teamList" class="list"><div class="empty">Carregando...</div></div>';
   admin.appendChild(view);
   document.getElementById('teamSave').onclick=saveTeamUser;
   document.getElementById('teamClear').onclick=clearTeamForm;
@@ -5666,7 +5666,7 @@ function ensureTeamView(){
 }
 function clearTeamForm(){
   ['teamName','teamUsername','teamPin','teamEditing'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
-  document.getElementById('teamUsername').readOnly=false;document.getElementById('teamPin').placeholder='Mínimo 4 números';
+  document.getElementById('teamUsername').readOnly=false;document.getElementById('teamPin').placeholder='Mínimo 6 números';
   document.getElementById('teamRole').value='staff';document.getElementById('teamSector').disabled=false;document.getElementById('teamActive').checked=true;
 }
 function fillTeamForm(user){
@@ -5686,7 +5686,7 @@ function saveTeamUser(){
   rpc('bd_admin_save_user',{p_admin_username:cloudCredentials.username,p_admin_pin:cloudCredentials.pin,p_username:username,p_full_name:name,p_new_pin:newPin,p_role:role,p_sector:sector,p_active:active}).then(function(result){
     if(!result||!result.ok)throw new Error(result&&result.message||'Não foi possível salvar.');
     if(username===cloudCredentials.username&&newPin){cloudCredentials.pin=newPin;saveDeviceLogin(cloudCredentials)}
-    clearTeamForm();document.getElementById('teamUsername').readOnly=false;document.getElementById('teamPin').placeholder='Mínimo 4 números';renderTeamUsers();toast('Funcionário salvo.');
+    clearTeamForm();document.getElementById('teamUsername').readOnly=false;document.getElementById('teamPin').placeholder='Mínimo 6 números';renderTeamUsers();toast('Funcionário salvo.');
   }).catch(function(err){toast(err.message||'Erro ao salvar funcionário.')}).finally(function(){button.disabled=false;button.textContent='Salvar funcionário'});
 }
 var previousAdminTab=window.adminTab;
