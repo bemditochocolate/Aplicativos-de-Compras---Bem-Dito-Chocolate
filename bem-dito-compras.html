@@ -4450,7 +4450,30 @@ renderProducts();
 })();
 </script>
 <script>
-/* Solicitante da lista: contador por setor na Lista Mestra. */
+/* Identidade do login; mantém as chaves e o agrupamento existentes por setor. */
+function bdRequesterIdentity(){
+  var user=typeof window.currentRequesterIdentity==='function'?window.currentRequesterIdentity():null;
+  if(!user||!String(user.username||'').trim()||!String(user.name||'').trim()||!String(user.sector||'').trim())return null;
+  return {username:String(user.username).trim().toLowerCase(),name:String(user.name).trim(),sector:String(user.sector).trim()};
+}
+function bdOwnRequest(item){var user=bdRequesterIdentity();return !!(user&&item&&String(item.requesterUsername||'').trim().toLowerCase()===user.username)}
+function bdRequestIdentityMessage(){return 'Não foi possível identificar seu usuário ou setor. Peça ao administrador para conferir seu cadastro em Gestão → Equipe.'}
+function bdCollectRequester(group,item,sector){
+  group.requesterUsernames=group.requesterUsernames||[];group.requesterLegacySectors=group.requesterLegacySectors||[];
+  var username=String(item.requesterUsername||'').trim().toLowerCase();
+  var values=username?group.requesterUsernames:group.requesterLegacySectors,value=username||sector||'Geral';
+  if(values.indexOf(value)<0)values.push(value);
+}
+function bdRequesterCount(item){
+  if(Array.isArray(item&&item.requesterUsernames)&&item.requesterUsernames.length){
+    return new Set(item.requesterUsernames).size+new Set(item.requesterLegacySectors||[]).size;
+  }
+  var sectors=Array.isArray(item&&item.requesterSectors)?item.requesterSectors:Object.keys(item&&item.sectors||{});
+  sectors=sectors.filter(function(name){return name&&name!=='Geral'&&name!=='Mercearia'&&name!=='Bebidas'&&name!=='Cozinha da Confeitaria'});
+  return Math.max(1,sectors.length||Number(item&&item.requesterCount||0)||1);
+}
+
+/* Solicitantes: estrutura existente por setor, identidade individual pelo login. */
 (function(){
 var REQUESTER_SECTORS=[
   'Confeitaria',
@@ -4462,12 +4485,7 @@ var REQUESTER_DAYS=['segunda','quarta','sexta'];
 function requesterDay(){
   return REQUESTER_DAYS.indexOf(state.marketDay)>-1?state.marketDay:'';
 }
-function requesterValue(){
-  if(REQUESTER_SECTORS.indexOf(state.requesterSector)<0){
-    state.requesterSector=REQUESTER_SECTORS[0];
-  }
-  return state.requesterSector;
-}
+function requesterValue(){var user=bdRequesterIdentity();return user?user.sector:''}
 function requesterMeta(key){
   var parts=String(key||'').split('|');
   if(parts.length>=3)return {listId:parts[0],day:parts[1],sector:parts.slice(2).join('|')||'Geral'};
@@ -4476,56 +4494,34 @@ function requesterMeta(key){
 function requesterListKey(){
   return state.currentList.id+'|'+(requesterDay()||'sem-lista')+'|'+requesterValue();
 }
-function ensureRequesterField(){
-  var collab=e('collab');
-  if(!collab)return;
-  var existing=e('requesterSector');
-  if(existing){
-    existing.value=requesterValue();
-    return;
-  }
-  var productField=collab.querySelector('.productField')||e('search')&&e('search').closest('.field');
-  if(!productField)return;
-  var field=document.createElement('div');
-  field.className='field collabField requesterField';
-  field.innerHTML='<label>Solicitante</label><select id="requesterSector">'+REQUESTER_SECTORS.map(function(name){
-    return '<option value="'+clean(name)+'">'+clean(name)+'</option>';
-  }).join('')+'</select>';
-  productField.parentNode.insertBefore(field,productField);
-  e('requesterSector').value=requesterValue();
-  e('requesterSector').onchange=function(){
-    state.requesterSector=this.value;
-    state.collabEditingQty=null;
-    save();
-    if(typeof renderResults==='function')renderResults();
-    if(typeof renderSectorList==='function')renderSectorList();
-    if(typeof syncTop==='function')syncTop();
-    setTimeout(function(){if(e('search')&&!e('search').disabled)e('search').focus()},20);
-  };
-}
+function ensureRequesterField(){var collab=e('collab');if(!collab)return;collab.querySelectorAll('.requesterField').forEach(function(field){field.remove()});var sector=collab.querySelector('#sector');if(sector&&sector.closest('.field'))sector.closest('.field').remove();}
 function requesterDraftRows(){
   var day=requesterDay();
-  if(!day)return [];
+  if(!day||!bdRequesterIdentity())return [];
   var key=requesterListKey();
   state.lists[key]=state.lists[key]||[];
   return (state.lists[key]||[]).map(function(item,index){
     return {key:key,item:item,index:index};
   }).filter(function(row){
-    return row.item&&!row.item.sent&&product(row.item.id);
+    return row.item&&!row.item.sent&&bdOwnRequest(row.item)&&product(row.item.id);
   });
 }
 function requesterRefreshControls(){
   ensureRequesterField();
   var day=requesterDay();
+  var identity=bdRequesterIdentity();
+  var message=e('requesterIdentityMessage');
+  if(!message&&e('search')){message=document.createElement('p');message.id='requesterIdentityMessage';message.className='muted';message.setAttribute('role','status');e('search').closest('.field').appendChild(message)}
+  if(message)message.textContent=identity?'':bdRequestIdentityMessage();
   var input=e('search');
   var send=e('send');
   if(input){
-    input.disabled=!day;
+    input.disabled=!day||!identity;
     input.placeholder=day?'Digite o produto':'Escolha uma lista primeiro';
     if(!day)input.value='';
   }
   if(send){
-    send.disabled=!day||requesterDraftRows().length===0;
+    send.disabled=!day||!identity||requesterDraftRows().length===0;
     send.textContent='Enviar para Lista Mestra';
   }
   document.querySelectorAll('[data-collab-day]').forEach(function(button){
@@ -4557,6 +4553,7 @@ function requesterItems(options){
       }
       grouped[item.id].qty+=Number(item.qty||1);
       var sectorName=meta.sector||'Geral';
+      bdCollectRequester(grouped[item.id],item,sectorName);
       grouped[item.id].sectors[sectorName]=Number(grouped[item.id].sectors[sectorName]||0)+1;
       grouped[item.id].days[meta.day||item.day||'geral']=true;
       if(item.note)grouped[item.id].notes.push((meta.sector||'Geral')+': '+item.note);
@@ -4570,7 +4567,7 @@ function requesterItems(options){
 window.listKey=requesterListKey;
 listKey=window.listKey;
 window.sectorItems=function(){
-  if(!requesterDay())return [];
+  if(!requesterDay()||!bdRequesterIdentity())return [];
   var key=requesterListKey();
   state.lists[key]=state.lists[key]||[];
   return state.lists[key];
@@ -4606,11 +4603,13 @@ window.addProductToList=function(id){
   var p=product(id);
   if(!p)return;
   var items=sectorItems();
-  var existing=items.find(function(item){return item.id===id&&!item.sent});
+  var existing=items.find(function(item){return item.id===id&&!item.sent&&bdOwnRequest(item)});
   if(existing){
     toast('Produto ja esta na lista deste solicitante.');
   }else{
-    items.push({id:id,qty:1,note:'',sent:false,status:'pending',listId:state.currentList.id,day:requesterDay()});
+    var user=bdRequesterIdentity();
+    if(!user){toast(bdRequestIdentityMessage());return}
+    items.push({id:id,qty:1,note:'',sent:false,status:'pending',listId:state.currentList.id,day:requesterDay(),requestedBy:user.name,requesterUsername:user.username,requesterSector:user.sector});
     toast('Produto adicionado.');
   }
   if(e('search'))e('search').value='';
@@ -4710,15 +4709,23 @@ window.renderAdminPendingPurchases=function(){
 renderAdminPendingPurchases=window.renderAdminPendingPurchases;
 var previousRequesterFinish=window.finishPurchase;
 window.finishPurchase=function(){
-  var snapshot={};
+  var snapshot={},identities={};
   requesterItems().forEach(function(item){
+    identities[item.product.id]={requesterUsernames:(item.requesterUsernames||[]).slice(),requesterLegacySectors:(item.requesterLegacySectors||[]).slice()};
     snapshot[item.product.id]=Object.keys(item.sectors||{}).filter(function(name){return name&&name!=='Geral'});
   });
   if(typeof previousRequesterFinish==='function')previousRequesterFinish();
   state.adminPendingItems=Array.isArray(state.adminPendingItems)?state.adminPendingItems:[];
   state.adminPendingItems.forEach(function(item){
     if(item&&snapshot[item.id]&&snapshot[item.id].length){
-      item.requesterSectors=snapshot[item.id];
+      var identity=identities[item.id];
+      if(identity){
+        var oldLegacy=Array.isArray(item.requesterUsernames)?(item.requesterLegacySectors||[]):(item.requesterSectors||[]);
+        item.requesterUsernames=Array.from(new Set((item.requesterUsernames||[]).concat(identity.requesterUsernames)));
+        item.requesterLegacySectors=Array.from(new Set(oldLegacy.concat(identity.requesterLegacySectors)));
+        item.requesterCount=bdRequesterCount(item);
+      }
+      item.requesterSectors=Array.from(new Set((item.requesterSectors||[]).concat(snapshot[item.id])));
     }
   });
   save();
@@ -4734,7 +4741,7 @@ document.addEventListener('click',function(event){
   var parts=String(remove.dataset.requesterRemove||'').split('::');
   var key=parts[0];
   var index=Number(parts[1]);
-  if(state.lists[key]&&state.lists[key][index]&&!state.lists[key][index].sent){
+  if(state.lists[key]&&state.lists[key][index]&&!state.lists[key][index].sent&&bdOwnRequest(state.lists[key][index])){
     state.lists[key].splice(index,1);
     save();
     renderSectorList();
@@ -4789,18 +4796,7 @@ var CLEAN_REQUESTER_SECTORS=[
   'Cozinha Almoco',
   'Frente de Loja'
 ];
-function cleanRequesterOptions(){
-  if(CLEAN_REQUESTER_SECTORS.indexOf(state.requesterSector)<0){
-    state.requesterSector=CLEAN_REQUESTER_SECTORS[0];
-  }
-  var select=e('requesterSector');
-  if(select){
-    select.innerHTML=CLEAN_REQUESTER_SECTORS.map(function(name){
-      return '<option value="'+clean(name)+'">'+clean(name)+'</option>';
-    }).join('');
-    select.value=state.requesterSector;
-  }
-}
+function cleanRequesterOptions(){var user=bdRequesterIdentity();if(user)state.requesterSector=user.sector;}
 function requesterSectorNames(item){
   var names=Object.keys(item&&item.sectors||{}).filter(function(name){
     return name&&name!=='Geral'&&name!=='Mercearia'&&name!=='Bebidas'&&name!=='Cozinha da Confeitaria';
@@ -4833,7 +4829,7 @@ function decorateRequesterBadges(){
     var item=lookup[productId];
     if(!item)return;
     var names=requesterSectorNames(item);
-    var count=Math.max(1,names.length);
+    var count=bdRequesterCount(item);
     var oldCell=row.querySelector('.adminRequesterCell,.adminProductRequester');
     var oldTitle=oldCell?oldCell.querySelector('strong'):row.querySelector(':scope > strong');
     var nameText=oldTitle?oldTitle.textContent:'Produto';
@@ -4930,7 +4926,7 @@ function pendingRequesterCount(item){
   sectors=sectors.filter(function(name){
     return name&&name!=='Geral'&&name!=='Mercearia'&&name!=='Bebidas'&&name!=='Cozinha da Confeitaria';
   });
-  var count=Math.max(1,sectors.length||Number(item&&item.requesterCount||0)||1);
+  var count=bdRequesterCount(item);
   return String(Math.round(count));
 }
 function pendingRequesterLookup(){
@@ -4995,7 +4991,7 @@ function visiblePendingCount(item){
   sectors=sectors.filter(function(name){
     return name&&name!=='Geral'&&name!=='Mercearia'&&name!=='Bebidas'&&name!=='Cozinha da Confeitaria';
   });
-  var count=sectors.length||Number(item&&item.requesterCount||0)||1;
+  var count=bdRequesterCount(item);
   return String(Math.max(1,Math.round(count)));
 }
 function pendingMarketText(item){
@@ -5637,15 +5633,9 @@ var previousAdminTab=window.adminTab;
 window.adminTab=function(id){if(typeof previousAdminTab==='function')previousAdminTab(id);if(id==='team')renderTeamUsers()};
 adminTab=window.adminTab;
 
+window.currentRequesterIdentity=function(){return cloudUser?{username:cloudUser.username,name:cloudUser.name,sector:cloudUser.sector}:null};
 var previousAddProduct=window.addProductToList;
-window.addProductToList=function(id){
-  if(typeof previousAddProduct==='function')previousAddProduct(id);
-  try{
-    var items=typeof sectorItems==='function'?sectorItems():[];
-    for(var i=items.length-1;i>=0;i--){if(items[i]&&items[i].id===id&&!items[i].sent){items[i].requestedBy=cloudUser&&cloudUser.name||'';items[i].requesterUsername=cloudUser&&cloudUser.username||'';break}}
-    save();
-  }catch(err){}
-};
+window.addProductToList=function(id){if(!bdRequesterIdentity()){toast(bdRequestIdentityMessage());return}if(typeof previousAddProduct==='function')previousAddProduct(id)};
 addProductToList=window.addProductToList;
 function decorateRequestedBy(){
   var names={};
