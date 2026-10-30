@@ -16,6 +16,9 @@
 </div><nav class="tabs"><button class="on" id="tabCollab"><span class="big">⌂</span><span>Lista</span></button><button id="tabMaster"><span class="big">☰</span><span>Mestra</span></button><button id="tabAdmin"><span class="big">◆</span><span>Admin</span></button></nav><div class="toast" id="toast"></div></section></div>
 <script>
 var ADMIN_PASSWORD='cloud-disabled';
+
+/* Rótulo compartilhado dos seletores de listas (somente apresentação). */
+function marketDayButtonLabel(day){var names={segunda:'Segunda-feira',quarta:'Quarta-feira',sexta:'Sexta-feira'};return '<span class="marketDayLine">Mercado</span><span class="marketDayLine">'+names[day]+'</span>'}
 var sectors=['Bebidas','Confeitaria','Cozinha da Loja','Cozinha do Almoço','Limpeza'];
 var statusLabels={pending:'Pendente',bought:'Comprado',notFound:'Não encontrado',replaced:'Substituído'};
 var statusClass={pending:'warn',bought:'ok',notFound:'bad',replaced:'info'};
@@ -455,7 +458,7 @@ function ensureDaySelector(){
   field.id='daySelector';
   field.className='daySelector';
   field.innerHTML='<label>Selecione a lista</label><div class="dayButtons">'+dayOptions.map(function(day){
-    return '<button type="button" data-market-day="'+day.id+'">'+day.label+'</button>';
+    return '<button type="button" data-market-day="'+day.id+'">'+marketDayButtonLabel(day.id)+'</button>';
   }).join('')+'</div><div class="selectedDay" id="selectedDayLabel"></div>';
   var sectorField=e('sector').closest('.field');
   sectorField.insertAdjacentElement('afterend',field);
@@ -817,7 +820,7 @@ function buildCollaboratorV3(){
   var collab=e('collab');
   collab.innerHTML=[
     '<div class="field collabField"><label>Selecionar Lista</label><div class="collabDayButtons">',
-    collaboratorLists.map(function(item){return '<button class="collabDayButton" type="button" data-collab-day="'+item.id+'">'+item.label+'</button>'}).join(''),
+    collaboratorLists.map(function(item){return '<button class="collabDayButton" type="button" data-collab-day="'+item.id+'">'+marketDayButtonLabel(item.id)+'</button>'}).join(''),
     '</div></div>',
     '<div class="field collabField"><label>Setor</label><select id="sector"></select></div>',
     '<div class="field collabField productField"><label>Produto</label><input id="search" type="search" placeholder="Digite o produto"></div>',
@@ -1498,7 +1501,7 @@ function ensureViewDayControls(){
     controls.id='collabMirrorControls';
     controls.className='collabMirrorControls';
     controls.innerHTML=viewDayOptions.map(function(option){
-      return '<button type="button" data-collab-view-day="'+option.id+'">'+clean(option.button)+'</button>';
+      return '<button type="button" data-collab-view-day="'+option.id+'">'+marketDayButtonLabel(option.id)+'</button>';
     }).join('');
     var heading=view.querySelector('.collabViewTitle');
     if(heading&&heading.nextSibling)view.insertBefore(controls,heading.nextSibling);
@@ -2118,7 +2121,7 @@ function ensurePendingViewControls(){
     controls.id='collabMirrorControls';
     controls.className='collabMirrorControls';
     controls.innerHTML=pendingViewDays.map(function(option){
-      return '<button type="button" data-collab-view-day="'+option.id+'">'+clean(option.button)+'</button>';
+      return '<button type="button" data-collab-view-day="'+option.id+'">'+marketDayButtonLabel(option.id)+'</button>';
     }).join('');
     var heading=view.querySelector('.collabViewTitle');
     if(heading&&heading.nextSibling)view.insertBefore(controls,heading.nextSibling);
@@ -6051,5 +6054,10 @@ start();
 
 </script>
 <style id="guideChecklistOnly">.adminFinalBuyRow,.adminPendingFinalRow{grid-template-columns:minmax(0,1fr) 38px!important}.adminPendingFinalRow.pendingCleanupRow{grid-template-columns:minmax(0,1fr) 38px 38px!important}.adminFinalCheck{grid-column:2!important;grid-row:1!important;justify-self:end}.adminPendingFinalRow.pendingCleanupRow .pendingRemoveOne{grid-column:3!important;grid-row:1!important}.adminFinalInputs{display:none!important}</style>
+<style id="marketDayButtonLayout">
+:is(.collabDayButtons,.collabMirrorControls,.dayButtons){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;container-type:inline-size}
+:is(.collabDayButtons,.collabMirrorControls,.dayButtons)>button{min-width:0;width:100%;height:48px;min-height:48px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 2px;text-align:center;font-size:clamp(10px,3.1vw,12px);font-size:clamp(10px,3.1cqi,12px);line-height:1.2}
+.marketDayLine{display:block;white-space:nowrap;word-break:normal;overflow-wrap:normal}
+</style>
 </body>
 </html>
