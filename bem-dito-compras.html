@@ -4511,8 +4511,7 @@ function requesterRefreshControls(){
   var day=requesterDay();
   var identity=bdRequesterIdentity();
   var message=e('requesterIdentityMessage');
-  if(!message&&e('search')){message=document.createElement('p');message.id='requesterIdentityMessage';message.className='muted';message.setAttribute('role','status');e('search').closest('.field').appendChild(message)}
-  if(message)message.textContent=identity?'':bdRequestIdentityMessage();
+  if(message)message.remove();
   var input=e('search');
   var send=e('send');
   if(input){
