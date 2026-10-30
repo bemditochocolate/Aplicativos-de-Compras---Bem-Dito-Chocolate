@@ -4523,9 +4523,10 @@ function requesterRefreshControls(){
     if(!day)input.value='';
   }
   if(send){
-    send.disabled=!day||!identity||requesterDraftRows().length===0;
-    send.textContent='Enviar para Lista Mestra';
+    send.disabled=!!window.marketListSending||!day||!identity||requesterDraftRows().length===0;
+    send.textContent=window.marketListSending?'Enviando...':'Enviar para Lista Mestra';
   }
+  document.querySelectorAll('#sectorList [data-requester-remove]').forEach(function(button){button.disabled=!!window.marketListSending});
   document.querySelectorAll('[data-collab-day]').forEach(function(button){
     button.classList.toggle('on',button.dataset.collabDay===day);
   });
@@ -4620,31 +4621,26 @@ window.addProductToList=function(id){
   save();
 };
 addProductToList=window.addProductToList;
-window.sendList=function(){
-  if(!requesterDay()){
-    toast('Escolha uma lista primeiro.');
-    return;
-  }
+window.sendList=async function(){
+  if(window.marketListSending)return;
+  if(!requesterDay()){toast('Escolha uma lista primeiro.');return}
   var rows=requesterDraftRows();
-  if(!rows.length){
-    toast('Nao ha produtos para enviar.');
-    requesterRefreshControls();
-    return;
-  }
-  rows.forEach(function(row){
-    row.item.sent=true;
-    row.item.status='pending';
-    row.item.listId=state.currentList.id;
-    row.item.day=requesterDay();
-  });
-  if(e('search'))e('search').value='';
-  save();
-  renderSectorList();
-  renderAdmin();
-  if(typeof renderMaster==='function')renderMaster();
-  if(typeof renderCollaboratorSentList==='function')renderCollaboratorSentList();
-  setTimeout(function(){if(e('search')&&!e('search').disabled)e('search').focus()},30);
-  toast('Lista enviada com sucesso!');
+  if(!rows.length){toast('Nao ha produtos para enviar.');requesterRefreshControls();return}
+  window.marketListSending=true;
+  var input=e('search'),previousText=input&&input.value;
+  if(input)input.blur();
+  requesterRefreshControls();
+  try{
+    if(typeof window.persistMarketList!=='function')throw new Error('Conexão indisponível. Tente novamente.');
+    await window.persistMarketList(rows,{listId:state.currentList.id,day:requesterDay()});
+    if(input&&input.value===previousText)input.value='';
+    if(typeof renderResults==='function')renderResults();
+    renderSectorList();renderAdmin();
+    if(typeof renderMaster==='function')renderMaster();
+    if(typeof renderCollaboratorSentList==='function')renderCollaboratorSentList();
+    toast('Lista enviada com sucesso!');
+  }catch(error){toast(error.message||'Não foi possível enviar. Os produtos foram preservados. Tente novamente.')}
+  finally{window.marketListSending=false;requesterRefreshControls()}
 };
 sendList=window.sendList;
 if(e('send'))e('send').onclick=window.sendList;
@@ -4738,6 +4734,7 @@ if(e('finishPurchase'))e('finishPurchase').onclick=window.finishPurchase;
 document.addEventListener('click',function(event){
   var remove=event.target.closest('[data-requester-remove]');
   if(!remove)return;
+  if(window.marketListSending){event.preventDefault();event.stopImmediatePropagation();return}
   event.preventDefault();
   event.stopImmediatePropagation();
   var parts=String(remove.dataset.requesterRemove||'').split('::');
@@ -5457,7 +5454,7 @@ function saveRemote(snapshot,expectedVersion,allowMerge){
   }).finally(function(){cloudSaving=false});
 }
 function scheduleRemoteSave(){
-  if(!cloudReady||cloudApplying||!cloudCredentials)return;
+  if(!cloudReady||cloudApplying||cloudListSubmitting||!cloudCredentials)return;
   var snapshot=sharedSnapshot();
   var json=JSON.stringify(snapshot);
   if(json===lastSharedJson)return;
@@ -5466,6 +5463,59 @@ function scheduleRemoteSave(){
 }
 window.save=function(){writeLocal();scheduleRemoteSave()};
 save=window.save;
+
+/* Confirma somente este envio antes de retirar os produtos da pré-lista. */
+var cloudListSubmitting=false;
+window.persistMarketList=async function(rows,selection){
+  if(cloudListSubmitting)throw new Error('Aguarde a confirmação do envio.');
+  if(!cloudReady||!cloudCredentials)throw new Error('Conexão indisponível. Os produtos continuam na pré-lista.');
+  cloudListSubmitting=true;
+  clearTimeout(cloudTimer);cloudTimer=null;
+  var credentials=cloudCredentials,confirmed=false;
+  try{
+    ensureItemIds();writeLocal();
+    var ids=rows.map(function(row){return row.item._cloudId});
+    var waitUntil=Date.now()+15000;
+    while(cloudSaving){if(Date.now()>waitUntil)throw new Error('A sincronização está demorando. Tente enviar novamente.');await new Promise(function(resolve){setTimeout(resolve,50)})}
+    if(cloudCredentials!==credentials)throw new Error('A sessão mudou. Entre novamente para enviar.');
+    var before=sharedSnapshot(),snapshot=clone(before),found=0;
+    Object.keys(snapshot.lists||{}).forEach(function(key){(snapshot.lists[key]||[]).forEach(function(item){
+      if(ids.indexOf(item._cloudId)<0)return;
+      item.sent=true;item.status='pending';item.listId=selection.listId;item.day=selection.day;found++;
+    })});
+    if(found!==ids.length)throw new Error('A pré-lista foi atualizada. Confira os produtos e tente novamente.');
+    var expected=cloudVersion,result=null;
+    setCloudStatus('Enviando lista...','');
+    try{
+      for(var attempt=0;attempt<2;attempt++){
+        result=await rpc('bd_save',{p_username:credentials.username,p_pin:credentials.pin,p_data:snapshot,p_expected_version:expected});
+        if(result&&result.ok)break;
+        if(!result||!result.conflict||attempt===1)throw new Error('Não foi possível confirmar o envio.');
+        var fresh=await loadRemote();
+        if(!fresh||!fresh.ok)throw new Error('Não foi possível atualizar a lista.');
+        snapshot=mergeShared(cloudBase,snapshot,fresh.data||{});expected=Number(fresh.version||0);
+      }
+    }catch(error){
+      /* Uma resposta perdida não deve criar uma segunda solicitação na nova tentativa. */
+      var fresh=await loadRemote().catch(function(){return null}),published=[];
+      if(fresh&&fresh.ok)Object.keys((fresh.data||{}).lists||{}).forEach(function(key){(fresh.data.lists[key]||[]).forEach(function(item){if(item.sent&&ids.indexOf(item._cloudId)>=0)published.push(item._cloudId)})});
+      if(!fresh||!fresh.ok||!ids.every(function(id){return published.indexOf(id)>=0}))throw error;
+      snapshot=clone(fresh.data);result={ok:true,version:fresh.version};
+    }
+    if(cloudCredentials!==credentials)throw new Error('A sessão mudou. Entre novamente para conferir o envio.');
+    var combined=mergeShared(before,sharedSnapshot(),snapshot);
+    cloudVersion=Number(result.version);cloudBase=clone(snapshot);lastSharedJson=JSON.stringify(snapshot);
+    applyShared(combined);confirmed=true;
+    setCloudStatus('Sincronizado · '+cloudUser.name,'ok');
+    return true;
+  }catch(error){
+    writeLocal();setCloudStatus('Envio não confirmado. Produtos preservados na pré-lista.','bad');
+    throw new Error('Não foi possível confirmar o envio. Os produtos continuam na pré-lista. Tente novamente.');
+  }finally{
+    cloudListSubmitting=false;
+    if(confirmed)scheduleRemoteSave();
+  }
+};
 
 function createChrome(){
   if(!document.getElementById('cloudIntegrationStyles')){
@@ -5571,8 +5621,9 @@ function logout(){
   showLogin('Você saiu do aplicativo.');
 }
 function poll(){
-  if(!cloudReady||cloudSaving||cloudTimer||!cloudCredentials)return;
+  if(!cloudReady||cloudSaving||cloudListSubmitting||cloudTimer||!cloudCredentials)return;
   loadRemote().then(function(result){
+    if(cloudListSubmitting)return;
     if(!result||!result.ok){logout();return}
     var remoteVersion=Number(result.version||0);
     if(remoteVersion>cloudVersion){
