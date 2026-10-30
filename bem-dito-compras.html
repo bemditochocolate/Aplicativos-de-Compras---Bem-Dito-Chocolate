@@ -1243,9 +1243,6 @@ function closeOpenProductModal(){
   }
   return false;
 }
-function focusCollaboratorSearch(){
-  setTimeout(function(){if(e('search')&&!e('search').disabled)e('search').focus()},30);
-}
 window.goBackLayer=function(){
   if(closeOpenProductModal())return;
   var screen=activeScreen();
@@ -1253,7 +1250,7 @@ window.goBackLayer=function(){
     runSilently(function(){setScreen('collab')});
     syncTop();
     renderSectorList();
-    focusCollaboratorSearch();
+    if(e('search'))e('search').blur();
     return;
   }
   if(screen==='collab'){
