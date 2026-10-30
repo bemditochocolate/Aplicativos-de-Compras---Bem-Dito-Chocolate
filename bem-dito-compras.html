@@ -5527,12 +5527,8 @@ function createChrome(){
   document.body.appendChild(login);
   var brand=document.querySelector('.brand');
   if(brand){
-    var button=document.createElement('button');
-    button.id='cloudUserButton';button.className='cloudUserButton';button.type='button';button.title='Sair';button.textContent='↪';
-    brand.appendChild(button);
     var line=document.createElement('div');line.id='cloudStatus';line.className='cloudStatus';line.textContent='Aguardando acesso';
     var grow=brand.querySelector('.grow');if(grow)grow.appendChild(line);
-    button.onclick=logout;
   }
   var savedName=localStorage.getItem('bd-cloud-username');
   if(savedName)document.getElementById('cloudUsername').value=savedName;
@@ -5593,7 +5589,22 @@ function enterApplication(){
     if(cloudUser.role==='admin')renderTeamUsers();
   }).catch(function(err){showLogin(err.message||'Não foi possível carregar os dados.')});
 }
+function syncLogoutButton(){
+  var button=document.getElementById('cloudUserButton');
+  if(!cloudUser||cloudUser.role!=='admin'){
+    if(button){button.onclick=null;button.remove()}
+    return;
+  }
+  var brand=document.querySelector('.brand');
+  if(!button&&brand){
+    button=document.createElement('button');
+    button.id='cloudUserButton';button.className='cloudUserButton';button.type='button';button.title='Sair';button.textContent='↪';
+    button.onclick=logout;
+    brand.appendChild(button);
+  }
+}
 function configureRole(){
+  syncLogoutButton();
   var isAdmin=cloudUser&&cloudUser.role==='admin';
   state.admin=!!isAdmin;
   ['tabMaster','tabAdmin'].forEach(function(id){var node=document.getElementById(id);if(node)node.classList.toggle('hide',!isAdmin)});
@@ -5617,6 +5628,7 @@ function logout(){
   clearDeviceLogin();
   cloudCredentials=null;cloudUser=null;cloudReady=false;cloudVersion=0;cloudBase={};lastSharedJson='';
   var pin=document.getElementById('cloudPin');if(pin)pin.value='';
+  syncLogoutButton();
   showLogin('Você saiu do aplicativo.');
 }
 function poll(){
