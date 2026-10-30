@@ -4456,8 +4456,10 @@ renderProducts();
 /* Identidade do login; mantém as chaves e o agrupamento existentes por setor. */
 function bdRequesterIdentity(){
   var user=typeof window.currentRequesterIdentity==='function'?window.currentRequesterIdentity():null;
-  if(!user||!String(user.username||'').trim()||!String(user.name||'').trim()||!String(user.sector||'').trim())return null;
-  return {username:String(user.username).trim().toLowerCase(),name:String(user.name).trim(),sector:String(user.sector).trim()};
+  if(!user||!String(user.username||'').trim()||!String(user.name||'').trim())return null;
+  var sector=String(user.sector||'').trim();
+  if(!sector&&user.role!=='admin')return null;
+  return {username:String(user.username).trim().toLowerCase(),name:String(user.name).trim(),sector:sector||'Administrador'};
 }
 function bdOwnRequest(item){var user=bdRequesterIdentity();return !!(user&&item&&String(item.requesterUsername||'').trim().toLowerCase()===user.username)}
 function bdRequestIdentityMessage(){return 'Não foi possível identificar seu usuário ou setor. Peça ao administrador para conferir seu cadastro em Gestão → Equipe.'}
@@ -5686,7 +5688,7 @@ var previousAdminTab=window.adminTab;
 window.adminTab=function(id){if(typeof previousAdminTab==='function')previousAdminTab(id);if(id==='team')renderTeamUsers()};
 adminTab=window.adminTab;
 
-window.currentRequesterIdentity=function(){return cloudUser?{username:cloudUser.username,name:cloudUser.name,sector:cloudUser.sector}:null};
+window.currentRequesterIdentity=function(){return cloudUser?{username:cloudUser.username,name:cloudUser.name,sector:cloudUser.sector,role:cloudUser.role}:null};
 var previousAddProduct=window.addProductToList;
 window.addProductToList=function(id){if(!bdRequesterIdentity()){toast(bdRequestIdentityMessage());return}if(typeof previousAddProduct==='function')previousAddProduct(id)};
 addProductToList=window.addProductToList;
