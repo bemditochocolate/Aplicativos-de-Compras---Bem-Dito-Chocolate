@@ -5416,14 +5416,16 @@ function mergeShared(base,local,remote){
   });
   return out;
 }
-function rpc(name,args){
-  return cloudClient.rpc(name,args).then(function(result){
+function rpc(name,args,signal){
+  var request=cloudClient.rpc(name,args);
+  if(signal)request=request.abortSignal(signal);
+  return request.then(function(result){
     if(result.error)throw result.error;
     return result.data;
   });
 }
-function loadRemote(){
-  return rpc('bd_load',{p_username:cloudCredentials.username,p_pin:cloudCredentials.pin});
+function loadRemote(signal){
+  return rpc('bd_load',{p_username:cloudCredentials.username,p_pin:cloudCredentials.pin},signal);
 }
 function saveRemote(snapshot,expectedVersion,allowMerge){
   cloudSaving=true;
@@ -5453,7 +5455,7 @@ function saveRemote(snapshot,expectedVersion,allowMerge){
   }).finally(function(){cloudSaving=false});
 }
 function scheduleRemoteSave(){
-  if(!cloudReady||cloudApplying||cloudListSubmitting||!cloudCredentials)return;
+  if(!cloudReady||cloudApplying||cloudListSubmitting||cloudManualSync||!cloudCredentials)return;
   var snapshot=sharedSnapshot();
   var json=JSON.stringify(snapshot);
   if(json===lastSharedJson)return;
@@ -5466,6 +5468,7 @@ save=window.save;
 /* Confirma somente este envio antes de retirar os produtos da pré-lista. */
 var cloudListSubmitting=false;
 window.persistMarketList=async function(rows,selection){
+  if(cloudManualSync)throw new Error('Aguarde a atualização dos dados e tente enviar novamente.');
   if(cloudListSubmitting)throw new Error('Aguarde a confirmação do envio.');
   if(!cloudReady||!cloudCredentials)throw new Error('Conexão indisponível. Os produtos continuam na pré-lista.');
   cloudListSubmitting=true;
@@ -5515,6 +5518,79 @@ window.persistMarketList=async function(rows,selection){
     if(confirmed)scheduleRemoteSave();
   }
 };
+
+/* Atualização manual: mesma conexão, versões e identificadores da sincronização. */
+var cloudManualSync=false,cloudPollActive=false,cloudSyncGeneration=0;
+function syncRefreshButton(){
+  var button=e('cloudRefreshButton');
+  if(!cloudUser||cloudUser.role!=='staff'){
+    if(button){button.onclick=null;button.remove()}
+    return;
+  }
+  if(!button){
+    button=document.createElement('button');button.id='cloudRefreshButton';button.className='icon';button.type='button';
+    button.title='Atualizar dados';button.setAttribute('aria-label','Atualizar dados');
+    button.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6.1 6.1A8 8 0 0 1 19.5 9L20 12M4 12l.5 3A8 8 0 0 0 17.9 17.9"/></svg>';
+    button.onclick=manualRefresh;
+    e('theme').insertAdjacentElement('afterend',button);
+  }
+  button.disabled=cloudManualSync;button.setAttribute('aria-busy',String(cloudManualSync));
+}
+function mergeRefreshData(base,local,remote){
+  var merged=mergeShared(base,local,remote),confirmed={};
+  Object.keys(remote.lists||{}).forEach(function(key){(remote.lists[key]||[]).forEach(function(item){if(item.sent)confirmed[item._cloudId]={key:key,item:item}})});
+  Object.keys(local.lists||{}).forEach(function(key){(local.lists[key]||[]).forEach(function(item){
+    if(item.sent)return;
+    var sent=confirmed[item._cloudId];
+    if(sent){
+      Object.keys(merged.lists).forEach(function(k){merged.lists[k]=merged.lists[k].filter(function(row){return row._cloudId!==item._cloudId})});
+      (merged.lists[sent.key]=merged.lists[sent.key]||[]).push(clone(sent.item));
+    }else{
+      var rows=merged.lists[key]=merged.lists[key]||[];
+      if(!rows.some(function(row){return row._cloudId===item._cloudId}))rows.push(clone(item));
+    }
+  })});
+  return merged;
+}
+async function manualRefresh(){
+  if(cloudManualSync)return;
+  if(!cloudReady||!cloudCredentials||navigator.onLine===false){toast('Não foi possível atualizar. Verifique sua conexão.');return}
+  cloudManualSync=true;cloudSyncGeneration++;syncRefreshButton();
+  clearTimeout(cloudTimer);cloudTimer=null;
+  var credentials=cloudCredentials,controller=new AbortController(),completed=false;
+  var timeout=setTimeout(function(){controller.abort()},15000);
+  try{
+    writeLocal();setCloudStatus('Atualizando...','');
+    while(cloudSaving||cloudListSubmitting||cloudPollActive){
+      if(controller.signal.aborted)throw new Error('timeout');
+      await new Promise(function(resolve){setTimeout(resolve,50)});
+    }
+    if(controller.signal.aborted||cloudCredentials!==credentials)throw new Error('cancelado');
+    var base=clone(cloudBase),fresh=await loadRemote(controller.signal),snapshot,before,result;
+    for(var attempt=0;attempt<2;attempt++){
+      if(!fresh||!fresh.ok||controller.signal.aborted||cloudCredentials!==credentials)throw new Error('conexão');
+      before=sharedSnapshot();snapshot=mergeRefreshData(base,before,fresh.data||{});
+      if(same(snapshot,fresh.data)){result={ok:true,version:fresh.version};break}
+      result=await rpc('bd_save',{p_username:credentials.username,p_pin:credentials.pin,p_data:snapshot,p_expected_version:Number(fresh.version||0)},controller.signal);
+      if(result&&result.ok)break;
+      if(!result||!result.conflict||attempt===1)throw new Error('conflito');
+      fresh=await loadRemote(controller.signal);
+    }
+    if(controller.signal.aborted||cloudCredentials!==credentials)throw new Error('cancelado');
+    var combined=mergeRefreshData(before,sharedSnapshot(),snapshot);
+    var input=e('search'),text=input?input.value:'';
+    cloudVersion=Number(result.version);cloudBase=clone(snapshot);lastSharedJson=JSON.stringify(snapshot);
+    applyShared(combined);
+    if(input)input.value=text;
+    renderResults();if(typeof renderCollaboratorSentList==='function')renderCollaboratorSentList();
+    completed=true;setCloudStatus('Atualizado · '+cloudUser.name,'ok');toast('Dados atualizados.');
+  }catch(error){
+    if(cloudCredentials===credentials){writeLocal();setCloudStatus('Não foi possível atualizar. Verifique sua conexão.','bad');toast('Não foi possível atualizar. Verifique sua conexão.')}
+  }finally{
+    clearTimeout(timeout);cloudManualSync=false;syncRefreshButton();
+    if(completed&&cloudCredentials===credentials)scheduleRemoteSave();
+  }
+}
 
 function createChrome(){
   if(!document.getElementById('cloudIntegrationStyles')){
@@ -5604,7 +5680,7 @@ function syncLogoutButton(){
   }
 }
 function configureRole(){
-  syncLogoutButton();
+  syncLogoutButton();syncRefreshButton();
   var isAdmin=cloudUser&&cloudUser.role==='admin';
   state.admin=!!isAdmin;
   ['tabMaster','tabAdmin'].forEach(function(id){var node=document.getElementById(id);if(node)node.classList.toggle('hide',!isAdmin)});
@@ -5628,19 +5704,21 @@ function logout(){
   clearDeviceLogin();
   cloudCredentials=null;cloudUser=null;cloudReady=false;cloudVersion=0;cloudBase={};lastSharedJson='';
   var pin=document.getElementById('cloudPin');if(pin)pin.value='';
-  syncLogoutButton();
+  syncLogoutButton();syncRefreshButton();
   showLogin('Você saiu do aplicativo.');
 }
 function poll(){
-  if(!cloudReady||cloudSaving||cloudListSubmitting||cloudTimer||!cloudCredentials)return;
+  if(!cloudReady||cloudSaving||cloudListSubmitting||cloudManualSync||cloudPollActive||cloudTimer||!cloudCredentials)return;
+  cloudPollActive=true;var generation=cloudSyncGeneration;
   loadRemote().then(function(result){
-    if(cloudListSubmitting)return;
+    if(cloudListSubmitting||cloudManualSync||generation!==cloudSyncGeneration)return;
     if(!result||!result.ok){logout();return}
     var remoteVersion=Number(result.version||0);
     if(remoteVersion>cloudVersion){
+      if(JSON.stringify(sharedSnapshot())!==lastSharedJson)return;
       cloudVersion=remoteVersion;cloudBase=clone(result.data||{});applyShared(cloudBase);lastSharedJson=JSON.stringify(sharedSnapshot());setCloudStatus('Atualizado · '+cloudUser.name,'ok');
     }
-  }).catch(function(){setCloudStatus('Conexão instável; tentando novamente...','bad')});
+  }).catch(function(){if(!cloudManualSync&&generation===cloudSyncGeneration)setCloudStatus('Conexão instável; tentando novamente...','bad')}).finally(function(){cloudPollActive=false});
 }
 
 function ensureTeamView(){
