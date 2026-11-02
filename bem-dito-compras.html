@@ -5355,10 +5355,15 @@ function writeLocal(){
   try{originalSave()}catch(err){localStorage.setItem('bd-compras-v4',JSON.stringify(state))}
 }
 function setCloudStatus(text,status){
+  var staff=!!(cloudUser&&cloudUser.role==='staff');
+  document.body.classList.toggle('staffHeader',staff);
   var line=document.getElementById('cloudStatus');
   if(!line)return;
-  line.textContent=text;
+  var label=staff?(status==='ok'?'Colaborador sincronizado: '+cloudUser.name:status==='bad'?'Colaborador sem sincronizar: '+cloudUser.name:'Colaborador — '+text+' · '+cloudUser.name):text;
+  line.textContent=label;
   line.className='cloudStatus '+(status||'');
+  if(staff){var detail=label+(status==='bad'?' — '+text:'');line.title=detail;line.setAttribute('aria-label',detail)}
+  else{line.removeAttribute('title');line.removeAttribute('aria-label')}
 }
 function refreshApp(){
   try{if(typeof initSectors==='function')initSectors()}catch(err){}
@@ -5705,6 +5710,7 @@ function logout(){
   cloudCredentials=null;cloudUser=null;cloudReady=false;cloudVersion=0;cloudBase={};lastSharedJson='';
   var pin=document.getElementById('cloudPin');if(pin)pin.value='';
   syncLogoutButton();syncRefreshButton();
+  document.body.classList.remove('staffHeader');
   showLogin('Você saiu do aplicativo.');
 }
 function poll(){
@@ -6216,6 +6222,15 @@ start();
 /* Centraliza a tela inicial sem impor 100% de altura ao filho do contêiner com padding. */
 .homeMode .content{display:flex;flex-direction:column}
 .homeMode #home.homeScreen.on{min-height:0;flex:0 0 auto;width:max-content;max-width:100%;align-self:center;margin-block:auto}
+</style>
+<style id="staffHeaderLayout">
+.staffHeader .top{padding:12px 16px}
+.staffHeader .brand{gap:6px;align-items:center}
+.staffHeader .brand>.logo,.staffHeader .brand>button{flex-shrink:0}
+.staffHeader .brand .grow{min-width:0}
+.staffHeader .brand h1{font-size:clamp(14px,4vw,20px);white-space:nowrap}
+.staffHeader #sub{display:none}
+.staffHeader #cloudStatus{margin-top:3px;font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </body>
 </html>
