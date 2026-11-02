@@ -6212,5 +6212,10 @@ start();
  }
 }
 </style>
+<style id="homeViewportFit">
+/* Centraliza a tela inicial sem impor 100% de altura ao filho do contêiner com padding. */
+.homeMode .content{display:flex;flex-direction:column}
+.homeMode #home.homeScreen.on{min-height:0;flex:0 0 auto;width:max-content;max-width:100%;align-self:center;margin-block:auto}
+</style>
 </body>
 </html>
