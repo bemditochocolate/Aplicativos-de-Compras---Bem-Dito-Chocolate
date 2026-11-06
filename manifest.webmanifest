@@ -1,0 +1,14 @@
+{
+  "id": "./bem-dito-compras.html",
+  "name": "Bendito Compras",
+  "short_name": "Bendito Compras",
+  "lang": "pt-BR",
+  "start_url": "./bem-dito-compras.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7b4b31",
+  "icons": [
+    {"src": "./bd-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}

@@ -7,6 +7,8 @@
 <style>
 :root{--bg:#fbf7f4;--surface:#fffdfb;--soft:#f4ebe4;--text:#211b18;--muted:#766b63;--line:#e6d8cf;--primary:#6f3f2c;--on:#fff;--ok:#2f7d52;--warn:#946000;--bad:#b3261e;--info:#315f92;color-scheme:light;font-family:Inter,Roboto,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}body.dark{--bg:#171311;--surface:#211b18;--soft:#302722;--text:#f4ede8;--muted:#cabbb1;--line:#4b3d36;--primary:#e5b69c;--on:#3d1f12;--ok:#8fd9ad;--warn:#f3c370;--bad:#ffb4ab;--info:#aecbf2;color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,var(--bg),var(--soft));color:var(--text)}button,input,select,textarea{font:inherit}button{border:0;cursor:pointer}.wrap{min-height:100vh;display:grid;place-items:center;padding:18px}.phone{width:min(100%,430px);height:min(900px,calc(100vh - 36px));background:var(--surface);border:1px solid var(--line);border-radius:28px;box-shadow:0 18px 50px rgba(59,37,25,.14);overflow:hidden;display:flex;flex-direction:column;position:relative}.top{padding:16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(111,63,44,.13),transparent)}.brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:14px;background:var(--primary);color:var(--on);display:grid;place-items:center;font-weight:900}.brand h1{font-size:20px;margin:0;line-height:1.1;letter-spacing:0}.brand p{font-size:12px;margin:3px 0 0;color:var(--muted);line-height:1.25}.grow{flex:1;min-width:0}.icon{width:40px;height:40px;border-radius:14px;background:var(--soft);color:var(--text);border:1px solid var(--line);display:grid;place-items:center}.listBadge{margin-top:12px;padding:10px 12px;background:var(--soft);border:1px solid var(--line);border-radius:8px}.listBadge strong{display:block;font-size:13px;line-height:1.2}.listBadge span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.content{padding:16px;overflow:auto;flex:1}.screen{display:none}.screen.on{display:block}.title{font-size:15px;margin:0 0 10px}.muted{color:var(--muted)}.field{display:grid;gap:7px;margin-bottom:12px}.field label{font-size:12px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}.field input,.field select,.field textarea{width:100%;min-height:48px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);padding:11px 12px;outline:none}.field textarea{min-height:68px;resize:vertical}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(111,63,44,.16)}.row{display:grid;grid-template-columns:1fr 112px;gap:10px}.btn{min-height:48px;border-radius:8px;padding:0 14px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;width:100%;gap:8px}.primary{background:var(--primary);color:var(--on)}.secondary{background:var(--soft);color:var(--text);border:1px solid var(--line)}.danger{background:rgba(179,38,30,.12);color:var(--bad);border:1px solid rgba(179,38,30,.24)}.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.list{display:grid;gap:10px}.card,.stat,.result{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:12px}.result{width:100%;text-align:left;color:var(--text)}.result strong,.result span{display:block}.result span{margin-top:3px;color:var(--muted);font-size:12px}.cardTop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.itemTitle{font-size:15px;line-height:1.25;margin:0}.meta{font-size:12px;color:var(--muted);line-height:1.35;margin:4px 0 0}.pill{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;white-space:nowrap}.ok{color:var(--ok);background:rgba(47,125,82,.12);border-color:rgba(47,125,82,.24)}.warn{color:var(--warn);background:rgba(148,96,0,.12);border-color:rgba(148,96,0,.24)}.bad{color:var(--bad);background:rgba(179,38,30,.12);border-color:rgba(179,38,30,.24)}.info{color:var(--info);background:rgba(49,95,146,.12);border-color:rgba(49,95,146,.24)}.empty{padding:22px 12px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;border-top:1px solid var(--line);background:var(--surface)}.tabs button{min-height:48px;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center;font-size:11px;font-weight:900}.tabs button.on{background:var(--soft);color:var(--primary)}.big{font-size:18px;line-height:1}.adminNav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}.adminNav button{min-height:44px;border-radius:8px;background:var(--soft);color:var(--text);border:1px solid var(--line);font-size:12px;font-weight:900}.adminNav button.on{background:var(--primary);color:var(--on);border-color:var(--primary)}.view{display:none}.view.on{display:block}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}.stat strong{display:block;font-size:21px;line-height:1.1}.stat span{display:block;color:var(--muted);font-size:12px;margin-top:4px}.price{font-weight:900;color:var(--primary);white-space:nowrap}.statusGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.statusGrid button{min-height:40px;border-radius:8px;background:var(--soft);border:1px solid var(--line);color:var(--text);font-size:12px;font-weight:900}.statusGrid button.on{background:var(--primary);border-color:var(--primary);color:var(--on)}.marketSection{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden}.marketHeader{width:100%;min-height:48px;background:var(--soft);color:var(--text);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-weight:900;text-align:left}.marketHeader span{color:var(--muted);font-size:12px}.marketItems{display:grid;gap:10px;padding:10px}.marketEmpty{padding:14px 10px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px}.checkLine{display:inline-flex;align-items:center;gap:8px;background:transparent;color:var(--text);padding:0;text-align:left;font-weight:900}.checkLine span{width:22px;height:22px;border:2px solid var(--primary);border-radius:6px;display:grid;place-items:center;color:var(--primary);font-size:13px;line-height:1}.marketItem{background:var(--panel)}.qtyLine{display:grid;grid-template-columns:36px 1fr 36px;gap:8px;align-items:center;margin-top:10px}.qtyLine button{height:36px;border-radius:8px;background:var(--soft);border:1px solid var(--line);color:var(--text);font-weight:900}.qtyLine input{height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);text-align:center}.miniObs{margin-top:8px}.miniObs textarea{width:100%;min-height:54px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:9px;resize:vertical}.hist{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:8px 0;font-size:13px}.hist:last-child{border-bottom:0}.toast{position:absolute;left:16px;right:16px;bottom:74px;background:var(--text);color:var(--surface);border-radius:8px;padding:12px 14px;font-size:13px;opacity:0;transform:translateY(18px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translateY(0)}.hide{display:none!important}@media(max-width:460px){.wrap{padding:0}.phone{width:100%;height:100vh;border-radius:0;border:0}.row{grid-template-columns:1fr 104px}}
 </style>
+<link rel="manifest" href="./manifest.webmanifest">
+<style>#reminderPanel button[hidden]{display:none}</style>
 </head>
 <body>
 <div class="wrap"><section class="phone"><header class="top"><div class="brand"><div class="logo">BD</div><div class="grow"><h1>Bem Dito Compras</h1><p id="sub">Colaborador · lista simples</p></div><button class="icon" id="theme" title="Tema">◐</button></div><div class="listBadge"><strong id="listNameTop">Lista Mestra</strong><span id="listIdTop">Identificador</span></div></header>
@@ -5684,7 +5686,78 @@ function syncLogoutButton(){
     brand.appendChild(button);
   }
 }
+var reminderBusy=false;
+function reminderRpc(action,subscription){
+  if(!cloudCredentials)return Promise.reject(new Error('Entre novamente para configurar os lembretes.'));
+  return rpc('bd_push_register',{
+    p_username:cloudCredentials.username,p_pin:cloudCredentials.pin,
+    p_action:action,p_subscription:subscription||null
+  }).then(function(result){
+    if(!result||!result.ok)throw new Error(result&&result.message||'Não foi possível configurar os lembretes. Tente novamente.');
+    return result;
+  });
+}
+function reminderSupported(){return window.isSecureContext&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window}
+function reminderKey(value){
+  var raw=atob(value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4));
+  return Uint8Array.from(raw,function(character){return character.charCodeAt(0)});
+}
+function reminderMessage(text){var message=document.getElementById('reminderMessage');if(message)message.textContent=text}
+function syncPushReminder(){
+  var panel=document.getElementById('reminderPanel');
+  if(!cloudUser){if(panel)panel.remove();return}
+  if(panel)return;
+  panel=document.createElement('details');panel.id='reminderPanel';panel.style.marginTop='16px';
+  panel.innerHTML='<summary style="cursor:pointer">Lembretes de compras</summary><p class="meta">Terça, quinta e sábado, às 17h30 (Brasília).</p><button type="button" class="btn secondary" id="reminderEnable">Ativar neste celular</button><button type="button" class="btn secondary" id="reminderDisable" hidden>Desativar neste celular</button><p id="reminderMessage" class="meta" role="status"></p>';
+  document.getElementById('collab').appendChild(panel);
+  document.getElementById('reminderEnable').onclick=function(){changePushReminder(true)};
+  document.getElementById('reminderDisable').onclick=function(){changePushReminder(false)};
+  if(!reminderSupported()){
+    document.getElementById('reminderEnable').disabled=true;
+    reminderMessage('Abra pelo Chrome no Android. No iPhone, adicione o aplicativo à Tela de Início e abra por ela.');
+    return;
+  }
+  var username=cloudUser.username;
+  navigator.serviceWorker.getRegistration(new URL('./',location.href)).then(function(registration){return registration&&registration.pushManager.getSubscription()}).then(function(subscription){
+    if(!cloudUser||cloudUser.username!==username||!document.getElementById('reminderEnable'))return;
+    if(subscription&&Notification.permission==='granted'&&localStorage.getItem('bdReminderUser')===username){
+      document.getElementById('reminderEnable').textContent='Confirmar ativação';
+      document.getElementById('reminderDisable').hidden=false;
+      reminderMessage('Notificações autorizadas neste aparelho.');
+    }
+  }).catch(function(){reminderMessage('Toque em ativar para configurar os lembretes.')});
+}
+async function changePushReminder(enable){
+  if(reminderBusy||!cloudUser)return;
+  reminderBusy=true;
+  var username=cloudUser.username,enableButton=document.getElementById('reminderEnable'),disableButton=document.getElementById('reminderDisable');
+  enableButton.disabled=true;disableButton.disabled=true;
+  try{
+    // Request permission directly from the user's tap, before network work.
+    if(enable&&await Notification.requestPermission()!=='granted')throw new Error('Notificações não autorizadas. Você pode permitir nas configurações do navegador.');
+    var registration=await navigator.serviceWorker.register('./bd-reminders-sw.js');
+    await navigator.serviceWorker.ready;
+    var subscription=await registration.pushManager.getSubscription();
+    if(!cloudUser||cloudUser.username!==username)throw new Error('Entre novamente para configurar os lembretes.');
+    if(enable){
+      var config=await reminderRpc('config');
+      if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:reminderKey(config.publicKey)});
+      if(!cloudUser||cloudUser.username!==username)throw new Error('Entre novamente para configurar os lembretes.');
+      await reminderRpc('save',subscription.toJSON());
+      localStorage.setItem('bdReminderUser',username);
+      enableButton.textContent='Confirmar ativação';disableButton.hidden=false;
+      reminderMessage('Lembretes ativados para terça, quinta e sábado às 17h30.');
+    }else{
+      if(subscription){await reminderRpc('disable',subscription.toJSON());await subscription.unsubscribe()}
+      localStorage.removeItem('bdReminderUser');disableButton.hidden=true;enableButton.textContent='Ativar neste celular';
+      reminderMessage('Lembretes desativados neste aparelho.');
+    }
+  }catch(error){reminderMessage(error.message||'Não foi possível configurar. Confira a conexão e tente novamente.')}
+  finally{reminderBusy=false;enableButton.disabled=false;disableButton.disabled=false}
+}
+
 function configureRole(){
+  syncPushReminder();
   syncLogoutButton();syncRefreshButton();
   var isAdmin=cloudUser&&cloudUser.role==='admin';
   state.admin=!!isAdmin;
@@ -5710,7 +5783,7 @@ function logout(){
   cloudCredentials=null;cloudUser=null;cloudReady=false;cloudVersion=0;cloudBase={};lastSharedJson='';
   var pin=document.getElementById('cloudPin');if(pin)pin.value='';
   syncLogoutButton();syncRefreshButton();
-  document.body.classList.remove('staffHeader');
+  document.body.classList.remove('staffHeader');syncPushReminder();
   showLogin('Você saiu do aplicativo.');
 }
 function poll(){
