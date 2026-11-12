@@ -6041,10 +6041,11 @@ async function receiptReadImages(){
   await receiptOcrWorker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6',user_defined_dpi:'300'});
   for(var photo of receiptEditor.data.photos){
    var prepared=await receiptPrepareOcrImage(photo),first=await receiptOcrWorker.recognize(prepared),chosen=first.data;
-   if(Number(chosen.confidence||0)<55||receiptReadingScore(chosen.text||'')<1){
+   var firstScore=receiptReadingScore(chosen.text||'');
+   if(Number(chosen.confidence||0)<55||firstScore<1){
     receiptEditorStatus('Conferindo uma segunda leitura da foto '+(texts.length+1)+'...');
     await receiptOcrWorker.setParameters({tessedit_pageseg_mode:'3'});var second=await receiptOcrWorker.recognize(photo);await receiptOcrWorker.setParameters({tessedit_pageseg_mode:'6'});
-    var firstScore=receiptReadingScore(chosen.text||''),secondScore=receiptReadingScore(second.data.text||'');
+    var secondScore=receiptReadingScore(second.data.text||'');
     if(secondScore>firstScore||secondScore===firstScore&&Number(second.data.confidence)>Number(chosen.confidence))chosen=second.data;
    }
    if(Number(chosen.confidence||0)<60)lowConfidence.push(texts.length+1);
@@ -6057,7 +6058,7 @@ async function receiptReadImages(){
 }
 
 function receiptJoinTexts(texts){var out=[];texts.forEach(function(text){var lines=String(text).split(/\r?\n/).map(function(s){return s.trim()}).filter(Boolean);var overlap=0;for(var n=Math.min(18,out.length,lines.length);n>=2;n--){if(out.slice(-n).map(receiptKey).join('|')===lines.slice(0,n).map(receiptKey).join('|')){overlap=n;break}}out=out.concat(lines.slice(overlap))});return out.join('\n')}
-function receiptParseText(text){
+function receiptParseText(text, scoreOnly){
  var lines=String(text||'').replace(/\r/g,'').split(/\n|;|\.(?=\s+(?:mercado|estabelecimento|\d+\s+[A-Za-zÀ-ÿ]))/i).map(function(s){return s.replace(/[|¦]/g,' ').replace(/[\t\u00a0]/g,' ').trim()}).filter(Boolean);
  var items=[],pending=null,merchant='',date='',printedTotal='',totalPriority=0,table=false,footer=false,warnings=[],unparsed=[],generalDiscount=0,discountSummary=null,extra=0;
  var unitPattern='(?:UNID(?:ADE)?S?|UND|UN|KG|KGS|GR|G|LT|L|ML|PCT|PC|PÇ|CX|FD|RL|ROLO|M|MT|PT|BD|SC|PAR)';
@@ -6071,12 +6072,13 @@ function receiptParseText(text){
  function flushPending(){if(pending&&pending.name){issue(pending,'Quantidade e preço não identificados. Complete pelos dados da foto.');items.push(pending)}pending=null}
  function add(item,detail){if(detail){item.qty=detail.qty;item.unit=receiptUnit(detail.unit||'unidade');item.price=detail.price==null?'':detail.price;item.total=detail.total==null?'':detail.total;if(detail.source&&item.sourceLines.indexOf(detail.source)<0)item.sourceLines.push(detail.source);if(detail.price==null)issue(item,'Preço unitário não identificado.')}items.push(item);pending=null}
  function details(s){
+  s=s.replace(/(\d\s*(?:unid|und|un|kg|pct|cx))\s*[x×*]\s*(?=\d|R\$)/gi,'$1 x ');
   var m=qtyUnit.exec(s),q,unit,prefix,rest,a;
   if(m){q=num(m[1]);unit=m[2];prefix=s.slice(0,m.index).trim();rest=s.slice(m.index+m[0].length).replace(/^R\$\s*/i,'');a=amounts(rest);if(a.length){return {name:prefix,qty:q,unit:unit,price:a[0].value,total:a.length>1?a[a.length-1].value:null,source:s}}}
   m=/(?:^|\s)(\d+(?:[.,]\d{1,6})?)\s*[xX×*]\s*(?:R\$\s*)?(\d+[.,]\d{2,6})(?=\s|$)/i.exec(s);
   if(m){a=amounts(s.slice(m.index+m[0].length));return {name:s.slice(0,m.index).trim(),qty:num(m[1]),unit:'unidade',price:num(m[2]),total:a.length?a[a.length-1].value:null,source:s}}
-  m=/\s(\d+(?:[.,]\d{1,3})?)\s+(\d+[.,]\d{2,6})\s+(\d+[.,]\d{2})\s*[FT]?\s*$/.exec(s);
-  if(m&&/[A-Za-zÀ-ÿ]/.test(s.slice(0,m.index)))return {name:s.slice(0,m.index),qty:num(m[1]),unit:'unidade',price:num(m[2]),total:num(m[3]),source:s};
+  m=/(?:^|\s)(\d+(?:[.,]\d{1,3})?)\s+(\d+[.,]\d{2,6})\s+(\d+[.,]\d{2})\s*[FT]?\s*$/.exec(s);
+  if(m&&(pending||/[A-Za-zÀ-ÿ]/.test(s.slice(0,m.index))))return {name:s.slice(0,m.index),qty:num(m[1]),unit:'unidade',price:num(m[2]),total:num(m[3]),source:s};
   return null;
  }
  var dateMatch=String(text).match(/\b(\d{2})[\/-](\d{2})[\/-](20\d{2})\b/);if(dateMatch)date=dateMatch[3]+'-'+dateMatch[2]+'-'+dateMatch[1];
@@ -6084,7 +6086,7 @@ function receiptParseText(text){
   var key=receiptKey(line),money=amounts(line),last=money.length?money[money.length-1].value:null;
   if(/^(?:qtd|qtde|quantidade)\s*(?:total\s*)?(?:de\s*)?(?:itens|produtos)\b/.test(key))return;
   if(/(?:descri[cç][aã]o|discrimina[cç][aã]o)/i.test(line)&&/(?:c[oó]d|qtd|qtde|unid|unit|valor|vl|total|produto)/i.test(line)||/^(?:qtd|qtde|quant|un|und|vl|valor)\s+(?:un|und|unit|unitario|total|qtd|qtde)/.test(key)||/^cod(?:igo)?\s+(?:produto|descricao)/.test(key)){table=true;return}
-  if(/^(?:cnpj|cpf|ie\b|im\b|inscricao|cep\b|telefone|fone\b|tel\b|endereco|rua\b|avenida\b|av\b|bairro|chave|protocolo|documento auxiliar|danfe|nfce|nfc e|nota fiscal|cupom fiscal|consumidor|operador|caixa\s*:|serie|emissao|emitida|data\b|hora\b|tribut|icms|pis\b|cofins|valor aproximado|aprox\s*tribut|lei\b|www\b|http|obrigado|volte sempre|nao fiscal|nota de exemplo)/.test(key)||/^[\d\s/.,:\-]+$/.test(line))return;
+  if(/^(?:cnpj|cpf|ie\b|im\b|inscricao|cep\b|telefone|fone\b|tel\b|endereco|rua\b|avenida\b|av\b|bairro|chave|protocolo|documento auxiliar|danfe|nfce|nfc e|nota fiscal|cupom fiscal|consumidor|operador|caixa\s*:|serie|emissao|emitida|data\b|hora\b|tribut|icms|pis\b|cofins|valor aproximado|aprox\s*tribut|lei\b|www\b|http|obrigado|volte sempre|nao fiscal|nota de exemplo)/.test(key))return;
   if(/^(?:subtotal|sub total|total bruto|valor bruto)\b/.test(key)){footer=true;return}
   if(/^(?:total(?:\s*geral|\s*liquido)?|valor\s*(?:total|a pagar|liquido)|a pagar)\b/.test(key)&&!/^total\s*(?:de\s*)?desc/.test(key)){
    flushPending();footer=true;var priority=/a pagar|liquido/.test(key)?3:/valor total|total geral/.test(key)?2:1;if(last!=null&&priority>=totalPriority){printedTotal=last;totalPriority=priority}return;
@@ -6107,6 +6109,12 @@ function receiptParseText(text){
   if(voice){flushPending();var name=voice[2],unit='unidade',u=/^(kg|quilos?|gramas?|litros?|pacotes?|caixas?|unidades?)\s+(?:de\s+)?(.+)$/i.exec(name);if(u){unit=receiptUnit(u[1]);name=u[2]}var item=make(name,line);add(item,{qty:num(voice[1]),unit:unit,price:num(voice[3]),total:null});table=true;return}
   var detail=details(line);
   if(detail){var candidate=cleanName(detail.name);if(candidate&&/[A-Za-zÀ-ÿ]/.test(candidate)){flushPending();add(make(candidate,line),detail)}else if(pending){add(pending,detail)}else if(items.length&&(items[items.length-1].qty===''||items[items.length-1].price==='')){var prior=items.pop();add(prior,detail)}else unparsed.push(line);table=true;return}
+  if (/^[\d\s/.,:\-]+$/.test(line)) {
+   if (pending && money.length === 1 && line.trim() === line.slice(money[0].index,money[0].end)) {
+    pending.total=last; pending.sourceLines.push(line); flushPending();
+   } else if (table && money.length) unparsed.push(line);
+   return;
+  }
   var startsItem=/^\s*#?\d{1,4}\s+(?:\d{5,14}\s+)?[A-Za-zÀ-ÿ]/.test(line)||/^\s*\d{5,14}\s+[A-Za-zÀ-ÿ]/.test(line);
   if(!table&&!startsItem&&!money.length&&index<6&&!/(?:bobina|embalagem|saco|leite|cafe|papel|farinha|acucar|marmita|pote|tampa)\b/.test(key)){
    if(!merchant&&/[A-Za-zÀ-ÿ]/.test(line)&&line.length>3)merchant=line.replace(/^(?:estabelecimento\s*:|comprei (?:no|na)\s+)/i,'').trim();return;
@@ -6122,7 +6130,7 @@ function receiptParseText(text){
   i.discount=receiptRound(i.discount||0);var q=num(i.qty),p=num(i.price),gross=q!=null&&p!=null?receiptRound(q*p):null;
   if(gross!=null){var expected=receiptRound(gross-i.discount);if(i.total==='')i.total=expected;else if(i.discount&&Math.abs(Number(i.total)-gross)<=.02)i.total=receiptRound(Number(i.total)-i.discount);else if(Math.abs(Number(i.total)-expected)>.02)issue(i,'Quantidade × preço − desconto não confere com o total lido. Confira a foto.');if(i.discount>gross)issue(i,'O desconto está maior que o valor do produto.')}
   if(q==null||q<=0)issue(i,'Quantidade não identificada.');if(p==null)issue(i,'Preço unitário não identificado.');
-  var suggested=receiptSuggestProduct(i.name);if(suggested&&receiptKey(suggested)!==receiptKey(i.name))i.suggestedName=suggested;
+  var suggested=scoreOnly ? null : receiptSuggestProduct(i.name);if(suggested&&receiptKey(suggested)!==receiptKey(i.name))i.suggestedName=suggested;
  });
  var itemDiscounts=items.reduce(function(s,i){return s+i.discount},0);
  if(discountSummary!=null){if(discountSummary+.02<itemDiscounts)warnings.push('O resumo dos descontos é menor que os descontos dos itens. Confira as linhas de desconto.');else generalDiscount=Math.max(0,discountSummary-itemDiscounts)}
@@ -6176,7 +6184,7 @@ function receiptShowReadingReview(parsed){
  box.innerHTML=(warnings.length?'<strong>Conferência da leitura</strong><ul>'+warnings.map(function(w){return '<li>'+clean(w)+'</li>'}).join('')+'</ul>':'')+(unparsed.length?'<details><summary>'+unparsed.length+' linha(s) não organizadas — confira se falta algum produto</summary><pre>'+clean(unparsed.join('\n'))+'</pre></details>':'');
 }
 
-function receiptReadingScore(text){var result=receiptParseText(text);return result.items.reduce(function(score,i){return score+(receiptNumber(i.qty)>0&&Number.isFinite(receiptNumber(i.price))?5:1)-(i.reviewReasons||[]).length*.2},0)}
+function receiptReadingScore(text){var result=receiptParseText(text,true);return result.items.reduce(function(score,i){return score+(receiptNumber(i.qty)>0&&Number.isFinite(receiptNumber(i.price))?5:1)-(i.reviewReasons||[]).length*.2},0)}
 
 function receiptInit(){
  var style=document.createElement('style');style.textContent='.receiptHero{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--soft);margin-bottom:12px}.receiptHero p,.receiptHint{font-size:12px;line-height:1.5}.receiptHero h2{font-size:19px}.receiptGrid,.receiptCapture{display:grid;grid-template-columns:1fr 1fr;gap:10px}.receiptStats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 20px}.receiptStats .stat strong{font-size:20px;overflow-wrap:anywhere}.receiptMessage{font-size:13px;line-height:1.5;color:var(--muted)}.receiptError{color:var(--bad)!important}.receiptSectionHead{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:16px 0 10px}.receiptSectionHead .title{margin:0}.receiptTextButton{background:var(--soft);color:var(--primary);padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}.receiptTableWrap{overflow:auto;margin-bottom:20px}.receiptTable{border-collapse:collapse;width:100%;font-size:12px}.receiptTable th,.receiptTable td{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line)}.receiptTable th{background:var(--soft)}.receiptSaved .btn{margin-top:10px}.receiptModal{position:fixed;inset:0;background:rgba(33,27,24,.5);z-index:10000;padding:12px;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto}.receiptModalBox{width:100%;max-width:660px;background:var(--surface);color:var(--text);padding:18px;border:1px solid var(--line);border-radius:16px;margin:auto}.receiptModalOpen{overflow:hidden}.receiptModal .field input{min-width:0}.receiptPhotos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.receiptPhoto{display:grid;gap:5px;font-size:11px;text-align:center}.receiptPhoto img{width:100%;height:130px;object-fit:contain;background:var(--soft);border:1px solid var(--line);border-radius:8px}.receiptDictation{margin:14px 0;padding:12px;background:var(--soft);border-radius:10px}.receiptDictation summary{cursor:pointer;font-weight:800;font-size:13px}.receiptDictation textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--surface);color:var(--text);margin-bottom:10px}.receiptItem{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}.receiptItemGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.receiptItem label{font-size:10px}.receiptPossibleDuplicate{border-color:var(--warn)}.receiptReviewTotal{display:grid;gap:6px;padding:14px;background:var(--soft);border-radius:10px;margin-bottom:12px;font-size:13px}.receiptReviewTotal strong{font-size:21px;color:var(--primary)}.receiptReviewCheck{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;margin:14px 0}.receiptReviewCheck input{width:20px;height:20px;flex-shrink:0}.receiptFooter{margin-top:16px}.receiptFilters .field{margin-bottom:10px}#quickPurchaseCard{display:none!important}.adminFinalInputs .adminBuyField:has([data-admin-final-price]){display:none!important}.adminFinalInputs{grid-template-columns:1fr!important}@media(max-width:460px){.receiptModal{padding:0}.receiptModalBox{border-radius:0;min-height:100%;padding:14px}.receiptItemGrid{grid-template-columns:1fr 1fr}.receiptPhotos{grid-template-columns:repeat(3,1fr)}.receiptPhoto img{height:100px}.receiptStats .stat strong{font-size:17px}}';style.textContent+='.receiptPhotoView{background:transparent;padding:0;border:0;cursor:zoom-in}.receiptPhotoViewer{position:fixed;inset:0;z-index:11000;background:var(--surface);overflow:auto;padding:12px;display:grid;align-content:start;gap:12px}.receiptPhotoViewer .btn{position:sticky;top:0;max-width:220px;z-index:1}.receiptPhotoViewer img{width:100%;height:auto;max-width:1200px;margin:auto}';document.head.appendChild(style);
